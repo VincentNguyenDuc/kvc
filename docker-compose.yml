@@ -1,0 +1,19 @@
+services:
+  kvc-dev:
+    build:
+      context: .
+      target: dev
+    container_name: kvc-dev
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    tty: true
+    stdin_open: true
+
+  kvc-run:
+    build:
+      context: .
+      target: run
+    container_name: kvc-run
+    ports:
+      - "8080:8080"
