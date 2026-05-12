@@ -6,10 +6,9 @@ SRC := $(wildcard src/*.c)
 HDR := $(wildcard src/*.h)
 FMT_FILES := $(SRC) $(HDR)
 OBJ := $(SRC:.c=.o)
-BIN := kvc
+BIN := kvc.o
 
 .PHONY: all clean run
-.PHONY: docker-build docker-dev docker-run docker-stop
 .PHONY: format format-check
 
 all: $(BIN)
@@ -25,18 +24,6 @@ run: $(BIN)
 
 clean:
 	rm -f $(OBJ) $(BIN)
-
-docker-build:
-	docker compose build
-
-docker-dev:
-	docker compose run --rm kvc-dev
-
-docker-run:
-	docker compose up --build kvc-run
-
-docker-stop:
-	docker compose down
 
 format:
 	clang-format -i $(FMT_FILES)

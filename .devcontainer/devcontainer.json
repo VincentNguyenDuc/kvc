@@ -1,0 +1,21 @@
+{
+    "name": "kvc-dev",
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "context": "..",
+        "target": "dev"
+    },
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "workspaceFolder": "/workspace",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.cpptools",
+                "ms-vscode.live-server",
+                "ms-vscode.makefile-tools",
+                "redhat.vscode-yaml",
+                "xaver.clang-format"
+            ]
+        }
+    }
+}
