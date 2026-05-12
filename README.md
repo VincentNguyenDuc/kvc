@@ -34,6 +34,8 @@ Responses:
 make
 ```
 
+Artifacts are placed under `build/`.
+
 ## Formatting
 
 Format all C and header files:
@@ -51,13 +53,13 @@ make format-check
 ## Run
 
 ```bash
-./kvc
+./build/kvc.o
 ```
 
 Optional args:
 
 ```bash
-./kvc <port> <hashmap_buckets>
+./build/kvc.o <port> <hashmap_buckets>
 ```
 
 Defaults:
@@ -70,7 +72,7 @@ Defaults:
 In terminal 1:
 
 ```bash
-./kvc
+./build/kvc.o
 ```
 
 In terminal 2:
@@ -91,3 +93,41 @@ VALUE hello
 OK
 NOT_FOUND
 ```
+
+## Profiling (perf + FlameGraph)
+
+Profiling scripts live in `perf/`:
+
+- `perf/check.sh` preflight for perf permissions
+- `perf/record.sh` captures `perf.data` while running a workload
+- `perf/workload.sh` default mixed GET/SET/DEL load
+- `perf/flamegraph.sh` generates SVG flamegraph
+
+Run the full profiling flow (profile-friendly build, perf capture, flamegraph generation):
+
+```bash
+make perf-profile
+```
+
+This writes:
+
+- `build/perf/perf.data`
+- `build/perf/flamegraph.svg`
+- `build/perf/server.log`
+
+Run individual steps:
+
+```bash
+make profile-build
+make perf-check
+make perf-record
+make perf-flamegraph
+```
+
+If `make perf-check` fails with `Operation not permitted` in a container, start the dev container with perf capabilities, for example:
+
+```text
+--cap-add=SYS_ADMIN --cap-add=PERFMON --security-opt seccomp=unconfined
+```
+
+You can also lower `kernel.perf_event_paranoid` on the host.
