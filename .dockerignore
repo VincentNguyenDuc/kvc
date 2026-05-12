@@ -1,0 +1,4 @@
+.git
+.gitignore
+kvc
+src/*.o
