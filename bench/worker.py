@@ -6,17 +6,11 @@ import time
 from perf_orchestrator import WorkerResult
 
 
-def make_worker(key_space: int, value_size: int, set_ratio: float, del_ratio: float):
-    """Return an async worker coroutine closed over KVC-specific parameters."""
+def make_worker(host: str, port: int, key_space: int, value_size: int, set_ratio: float, del_ratio: float):
+    """Return an async worker closed over all KVC connection and workload parameters."""
     val = "x" * value_size
 
-    async def _worker(
-        host: str,
-        port: int,
-        n_requests: int,
-        n_warmup: int,
-        result: WorkerResult,
-    ) -> None:
+    async def _worker(n_requests: int, n_warmup: int, result: WorkerResult) -> None:
         reader, writer = await asyncio.open_connection(host, port)
         sock = writer.transport.get_extra_info("socket")
         sock.setsockopt(_socket.IPPROTO_TCP, _socket.TCP_NODELAY, 1)

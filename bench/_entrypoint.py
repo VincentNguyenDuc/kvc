@@ -51,30 +51,6 @@ def _stop(proc: subprocess.Popen, sig: signal.Signals = signal.SIGTERM, wait: fl
         proc.wait()
 
 
-def _perf_report(perf_data: Path) -> str:
-    if not perf_data.exists() or perf_data.stat().st_size == 0:
-        return "(perf.data missing or empty — perf record may have failed)"
-    r = subprocess.run(
-        ["perf", "report", "-i", str(perf_data), "--stdio", "--no-children", "-g", "none"],
-        capture_output=True,
-        text=True,
-    )
-    if r.returncode != 0:
-        return f"(perf report failed)\n{r.stderr.strip()}"
-    lines = [l for l in r.stdout.splitlines() if l and not l.startswith("#")]
-    return "\n".join(lines) or f"(no samples)\n{r.stderr.strip()}"
-
-
-def _flamegraph(perf_data: Path) -> bytes | None:
-    if not (_FG_COLLAPSE.is_file() and _FG_RENDER.is_file()):
-        print("warning: FlameGraph scripts not found, skipping flamegraph", file=sys.stderr)
-        return None
-    s = subprocess.run(["perf", "script", "-i", str(perf_data)], capture_output=True)
-    c = subprocess.run(["perl", str(_FG_COLLAPSE)], input=s.stdout, capture_output=True)
-    r = subprocess.run(["perl", str(_FG_RENDER)],   input=c.stdout, capture_output=True)
-    return r.stdout if r.returncode == 0 and r.stdout else None
-
-
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--output",      required=True)
@@ -103,36 +79,22 @@ def main() -> None:
     )
     _wait_for_server()
 
-    perf_record: subprocess.Popen | None = None
+    perf_record = po.PerfRecord(server.pid, perf_data)
     bench_result: dict = {}
 
     try:
         # ------------------------------------------------------------------
         # 2. perf record
         # ------------------------------------------------------------------
-        perf_record = subprocess.Popen(
-            [
-                "perf", "record",
-                "-p", str(server.pid),
-                "-e", "cpu-clock",
-                "--call-graph", "dwarf",
-                "-F", "99",
-                "-o", str(perf_data),
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-        )
+        perf_record.start()
 
         # ------------------------------------------------------------------
         # 3. Benchmark
         # ------------------------------------------------------------------
-        import argparse as _ap
-        worker = make_worker(args.key_space, args.value_size, args.set_ratio, args.del_ratio)
-        bench_result = po.run(_ap.Namespace(
-            host="127.0.0.1",
-            port=8080,
+        worker = make_worker("127.0.0.1", 8080, args.key_space, args.value_size, args.set_ratio, args.del_ratio)
+        bench_result = po.run(argparse.Namespace(
             requests=args.requests,
-            connections=args.connections,
+            workers=args.connections,
             warmup=args.warmup,
             label=args.label,
             perf_pid=server.pid,
@@ -140,21 +102,19 @@ def main() -> None:
         po.print_result(bench_result)
 
     finally:
-        if perf_record is not None:
-            _stop(perf_record, signal.SIGINT)
-            perf_err = perf_record.stderr.read().decode(errors="replace").strip()
-            if perf_err:
-                print(f"[perf record] {perf_err}", file=sys.stderr)
+        perf_err = perf_record.stop()
+        if perf_err:
+            print(f"[perf record] {perf_err}", file=sys.stderr)
         _stop(server)
 
     # ------------------------------------------------------------------
     # 4. Post-processing
     # ------------------------------------------------------------------
     print("\n==> Generating perf report...")
-    report = _perf_report(perf_data)
+    report = perf_record.report()
 
     print("==> Generating flamegraph...")
-    fg = _flamegraph(perf_data)
+    fg = perf_record.flamegraph(_FG_COLLAPSE, _FG_RENDER)
 
     # ------------------------------------------------------------------
     # 5. Write output files
