@@ -54,7 +54,6 @@ RUN apt-get update \
         libc6-dbg \
     && rm -rf /var/lib/apt/lists/*
 COPY . /workspace
-RUN git submodule update --init --recursive
 RUN pip3 install --break-system-packages /workspace/tools/perf-orchestrator
 RUN make clean && make CFLAGS="-O2 -g -Wall -Wextra -Wpedantic -fno-omit-frame-pointer"
 CMD ["python3", "bench/_entrypoint.py"]

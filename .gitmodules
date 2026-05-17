@@ -3,4 +3,4 @@
 	url = https://github.com/brendangregg/FlameGraph
 [submodule "tools/perf-orchestrator"]
 	path = tools/perf-orchestrator
-	url = git@github.com:VincentNguyenDuc/perf-orchestrator.git
+	url = https://github.com/VincentNguyenDuc/perf-orchestrator.git

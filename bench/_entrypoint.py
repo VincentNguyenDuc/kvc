@@ -10,6 +10,7 @@ Always runs the full pipeline:
   4. Stop perf record; generate perf-report.txt and flamegraph.svg
   5. Write bench.json, perf-report.txt, flamegraph.svg, perf.data, meta.json to --output
 """
+
 import argparse
 import json
 import signal
@@ -25,10 +26,12 @@ import perf_orchestrator as po
 from bench.worker import make_worker
 
 _FG_COLLAPSE = Path("tools/FlameGraph/stackcollapse-perf.pl")
-_FG_RENDER   = Path("tools/FlameGraph/flamegraph.pl")
+_FG_RENDER = Path("tools/FlameGraph/flamegraph.pl")
 
 
-def _wait_for_server(host: str = "127.0.0.1", port: int = 8080, timeout: float = 5.0) -> None:
+def _wait_for_server(
+    host: str = "127.0.0.1", port: int = 8080, timeout: float = 5.0
+) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
@@ -39,7 +42,9 @@ def _wait_for_server(host: str = "127.0.0.1", port: int = 8080, timeout: float =
     sys.exit(f"error: server did not start on {host}:{port} within {timeout}s")
 
 
-def _stop(proc: subprocess.Popen, sig: signal.Signals = signal.SIGTERM, wait: float = 5.0) -> None:
+def _stop(
+    proc: subprocess.Popen, sig: signal.Signals = signal.SIGTERM, wait: float = 5.0
+) -> None:
     try:
         proc.send_signal(sig)
     except ProcessLookupError:
@@ -53,17 +58,17 @@ def _stop(proc: subprocess.Popen, sig: signal.Signals = signal.SIGTERM, wait: fl
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--output",      required=True)
-    p.add_argument("--run-id",      default="")
-    p.add_argument("--label",       default="")
-    p.add_argument("--git-commit",  default="unknown")
-    p.add_argument("--requests",    type=int,   default=100_000)
-    p.add_argument("--connections", type=int,   default=1)
-    p.add_argument("--warmup",      type=int,   default=1_000)
-    p.add_argument("--key-space",   type=int,   default=10_000)
-    p.add_argument("--value-size",  type=int,   default=64)
-    p.add_argument("--set-ratio",   type=float, default=0.15)
-    p.add_argument("--del-ratio",   type=float, default=0.05)
+    p.add_argument("--output", required=True)
+    p.add_argument("--run-id", default="")
+    p.add_argument("--label", default="")
+    p.add_argument("--git-commit", default="unknown")
+    p.add_argument("--requests", type=int, default=100_000)
+    p.add_argument("--connections", type=int, default=1)
+    p.add_argument("--warmup", type=int, default=1_000)
+    p.add_argument("--key-space", type=int, default=10_000)
+    p.add_argument("--value-size", type=int, default=64)
+    p.add_argument("--set-ratio", type=float, default=0.15)
+    p.add_argument("--del-ratio", type=float, default=0.05)
     args = p.parse_args()
 
     output = Path(args.output)
@@ -91,14 +96,24 @@ def main() -> None:
         # ------------------------------------------------------------------
         # 3. Benchmark
         # ------------------------------------------------------------------
-        worker = make_worker("127.0.0.1", 8080, args.key_space, args.value_size, args.set_ratio, args.del_ratio)
-        bench_result = po.run(argparse.Namespace(
-            requests=args.requests,
-            workers=args.connections,
-            warmup=args.warmup,
-            label=args.label,
-            perf_pid=server.pid,
-        ), worker)
+        worker = make_worker(
+            "127.0.0.1",
+            8080,
+            args.key_space,
+            args.value_size,
+            args.set_ratio,
+            args.del_ratio,
+        )
+        bench_result = po.run(
+            argparse.Namespace(
+                requests=args.requests,
+                workers=args.connections,
+                warmup=args.warmup,
+                label=args.label,
+                perf_pid=server.pid,
+            ),
+            worker,
+        )
         po.print_result(bench_result)
 
     finally:
@@ -124,21 +139,26 @@ def main() -> None:
     if fg:
         (output / "flamegraph.svg").write_bytes(fg)
 
-    (output / "meta.json").write_text(json.dumps({
-        "run_id":     args.run_id,
-        "label":      args.label,
-        "timestamp":  datetime.now(timezone.utc).isoformat(),
-        "git_commit": args.git_commit,
-        "bench": {
-            "requests":    args.requests,
-            "connections": args.connections,
-            "warmup":      args.warmup,
-            "key_space":   args.key_space,
-            "value_size":  args.value_size,
-            "set_ratio":   args.set_ratio,
-            "del_ratio":   args.del_ratio,
-        },
-    }, indent=2))
+    (output / "meta.json").write_text(
+        json.dumps(
+            {
+                "run_id": args.run_id,
+                "label": args.label,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "git_commit": args.git_commit,
+                "bench": {
+                    "requests": args.requests,
+                    "connections": args.connections,
+                    "warmup": args.warmup,
+                    "key_space": args.key_space,
+                    "value_size": args.value_size,
+                    "set_ratio": args.set_ratio,
+                    "del_ratio": args.del_ratio,
+                },
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

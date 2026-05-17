@@ -12,6 +12,7 @@ PROFILE_CFLAGS := -O2 -g -fno-omit-frame-pointer -Wall -Wextra -Wpedantic
 
 .PHONY: all clean run
 .PHONY: format format-check
+.PHONY: format-py format-py-check lint-py
 .PHONY: profile-build
 .PHONY: bench-build bench
 
@@ -30,7 +31,8 @@ $(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)
 init:
 	git submodule update --init --recursive
 	uv venv
-	uv pip install -e tools/perf-orchestrator
+	uv pip install -e "tools/perf-orchestrator[dev]"
+	uv pip install black ruff
 
 run: $(BIN)
 	./$(BIN)
@@ -53,3 +55,12 @@ format:
 
 format-check:
 	clang-format --dry-run --Werror $(FMT_FILES)
+
+format-py:
+	.venv/bin/black bench/
+
+format-py-check:
+	.venv/bin/black --check bench/
+
+lint-py:
+	.venv/bin/ruff check bench/
