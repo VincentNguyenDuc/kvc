@@ -1,3 +1,6 @@
 [submodule "tools/FlameGraph"]
 	path = tools/FlameGraph
 	url = https://github.com/brendangregg/FlameGraph
+[submodule "tools/py-perf"]
+    path = tools/py-perf
+    url = https://github.com/VincentNguyenDuc/py-perf.git

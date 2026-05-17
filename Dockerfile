@@ -47,11 +47,14 @@ FROM base AS bench
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         python3 \
+        python3-pip \
         util-linux \
         linux-perf \
         perl \
         libc6-dbg \
     && rm -rf /var/lib/apt/lists/*
 COPY . /workspace
+RUN git submodule update --init --recursive
+RUN pip3 install --break-system-packages /workspace/tools/py-perf
 RUN make clean && make CFLAGS="-O2 -g -Wall -Wextra -Wpedantic -fno-omit-frame-pointer"
-CMD ["bash", "bench/run.sh"]
+CMD ["python3", "bench/_entrypoint.py"]

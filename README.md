@@ -123,7 +123,7 @@ make bench BENCH_ARGS="--requests 200000 --connections 4 --label 'v1 4-conn'"
 Or call the script directly for full control:
 
 ```bash
-bench/run.sh --requests 100000 --connections 1 --label "v1 baseline"
+python bench/run.py --requests 100000 --connections 1 --label "v1 baseline"
 ```
 
 ### Parameters
@@ -158,8 +158,8 @@ latency us  : min=28.4  p50=39.1  p95=52.3  p99=71.8  p999=124.6  max=891.2
 Use `--label` and `--json` to capture results for each version:
 
 ```bash
-bench/run.sh --label "v1" --json > results/v1.json
-bench/run.sh --label "v2" --json > results/v2.json
+python bench/run.py --label "v1" --json > results/v1.json
+python bench/run.py --label "v2" --json > results/v2.json
 ```
 
 ### Profiling (hardware counters + flamegraph)
@@ -167,19 +167,19 @@ bench/run.sh --label "v2" --json > results/v2.json
 Pass `--with-perf` to enable server-side profiling alongside the benchmark:
 
 ```bash
-bench/run.sh --with-perf --label "v1"
+python bench/run.py --with-perf --label "v1"
 ```
 
 This adds Docker perf capabilities, attaches `perf stat` to the server process via
-`bench.py`, and runs `perf record` in parallel. After the benchmark you get:
+the bench package, and runs `perf record` in parallel. After the benchmark you get:
 
 - Hardware counters: cache miss rate, IPC, CPI, branch miss rate
 - Hot-path report: top functions by CPU time (`perf report --stdio`)
 
-Add `--with-flamegraph` to also generate an interactive SVG in `bench/results/`:
+Add `--with-flamegraph` to also generate an interactive SVG in `bench/output/`:
 
 ```bash
-bench/run.sh --with-flamegraph --label "v1"
+python bench/run.py --with-flamegraph --label "v1"
 ```
 
 > **Note:** hardware counters (`perf stat`) require PMU support in the Docker VM.

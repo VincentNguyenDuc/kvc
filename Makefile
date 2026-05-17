@@ -29,7 +29,8 @@ $(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)
 
 init:
 	git submodule update --init --recursive
-	
+	uv venv
+	uv pip install -e tools/py-perf
 
 run: $(BIN)
 	./$(BIN)
@@ -41,8 +42,8 @@ profile-build:
 bench-build:
 	docker build --target bench -t kvc-bench .
 
-bench: bench-build
-	bench/run.sh $(BENCH_ARGS)
+bench:
+	python3 bench/run.py $(BENCH_ARGS)
 
 clean:
 	rm -rf $(BUILD_DIR)
