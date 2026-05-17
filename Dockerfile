@@ -37,4 +37,21 @@ FROM base AS run
 COPY . /workspace
 RUN make clean && make
 EXPOSE 8080
-CMD ["./kvc", "8080", "1024"]
+CMD ["./build/kvc.o", "8080", "1024"]
+
+# Bench stage: server binary + Python3 benchmark client + perf + taskset
+#
+# Built with -fno-omit-frame-pointer so perf can unwind call stacks via frame
+# pointers (--call-graph fp) without the overhead of DWARF unwinding.
+FROM base AS bench
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        python3 \
+        util-linux \
+        linux-perf \
+        perl \
+        libc6-dbg \
+    && rm -rf /var/lib/apt/lists/*
+COPY . /workspace
+RUN make clean && make CFLAGS="-O2 -g -Wall -Wextra -Wpedantic -fno-omit-frame-pointer"
+CMD ["bash", "bench/run.sh"]
