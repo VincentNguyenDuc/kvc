@@ -2,13 +2,13 @@
 import json
 import sys
 
-import pyperf
+import perf_orchestrator as po
 
 from .worker import make_worker
 
 
 def main() -> None:
-    p = pyperf.build_parser(description="kvc-bench: throughput and latency benchmark for kvc")
+    p = po.build_parser(description="kvc-bench: throughput and latency benchmark for kvc")
     p.add_argument("--key-space",  type=int,   default=10_000, help="number of unique keys")
     p.add_argument("--value-size", type=int,   default=64,     help="value size in bytes")
     p.add_argument("--set-ratio",  type=float, default=0.15,   help="fraction of SET ops")
@@ -20,12 +20,12 @@ def main() -> None:
         sys.exit(1)
 
     worker = make_worker(args.key_space, args.value_size, args.set_ratio, args.del_ratio)
-    result = pyperf.run(args, worker)
+    result = po.run(args, worker)
 
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        pyperf.print_result(result)
+        po.print_result(result)
 
 
 if __name__ == "__main__":

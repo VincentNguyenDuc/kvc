@@ -3,7 +3,7 @@ import random
 import socket as _socket
 import time
 
-from pyperf import WorkerResult
+from perf_orchestrator import WorkerResult
 
 
 def make_worker(key_space: int, value_size: int, set_ratio: float, del_ratio: float):

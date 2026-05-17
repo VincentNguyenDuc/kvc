@@ -30,7 +30,7 @@ $(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)
 init:
 	git submodule update --init --recursive
 	uv venv
-	uv pip install -e tools/py-perf
+	uv pip install -e tools/perf-orchestrator
 
 run: $(BIN)
 	./$(BIN)

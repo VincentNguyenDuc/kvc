@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, "/workspace")
-import pyperf
+import perf_orchestrator as po
 from bench.worker import make_worker
 
 _FG_COLLAPSE = Path("tools/FlameGraph/stackcollapse-perf.pl")
@@ -128,7 +128,7 @@ def main() -> None:
         # ------------------------------------------------------------------
         import argparse as _ap
         worker = make_worker(args.key_space, args.value_size, args.set_ratio, args.del_ratio)
-        bench_result = pyperf.run(_ap.Namespace(
+        bench_result = po.run(_ap.Namespace(
             host="127.0.0.1",
             port=8080,
             requests=args.requests,
@@ -137,7 +137,7 @@ def main() -> None:
             label=args.label,
             perf_pid=server.pid,
         ), worker)
-        pyperf.print_result(bench_result)
+        po.print_result(bench_result)
 
     finally:
         if perf_record is not None:
