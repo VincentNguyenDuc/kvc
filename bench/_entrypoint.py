@@ -4,56 +4,94 @@
 Called by bench/run.py inside the Docker container. Not intended for direct use.
 
 Always runs the full pipeline:
-  1. Start server pinned to core 0
-  2. Start perf record (cpu-clock + dwarf call-graph)
-  3. Run benchmark with perf stat attached for hardware counters
-  4. Stop perf record; generate perf-report.txt and flamegraph.svg
-  5. Write bench.json, perf-report.txt, flamegraph.svg, perf.data, meta.json to --output
+  1. Start server pinned to core 0 with perf stat + perf record attached
+  2. Run benchmark workers concurrently
+  3. Stop server; flush perf data
 """
 
 import argparse
-import json
-import signal
+import asyncio
+import random
 import socket
-import subprocess
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, "/workspace")
 import perf_orchestrator as po
-from bench.worker import make_worker
 
-_FG_COLLAPSE = Path("tools/FlameGraph/stackcollapse-perf.pl")
-_FG_RENDER = Path("tools/FlameGraph/flamegraph.pl")
+sys.path.insert(0, "/workspace")
 
 
-def _wait_for_server(
+def tcp_ready(
     host: str = "127.0.0.1", port: int = 8080, timeout: float = 5.0
-) -> None:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        try:
-            socket.create_connection((host, port), timeout=0.1).close()
-            return
-        except OSError:
-            time.sleep(0.1)
-    sys.exit(f"error: server did not start on {host}:{port} within {timeout}s")
+) -> po.ReadyFn:
+    """Return a readiness check that polls until a TCP connection succeeds."""
+
+    def _check() -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                socket.create_connection((host, port), timeout=0.1).close()
+                return
+            except OSError:
+                time.sleep(0.05)
+        raise TimeoutError(
+            f"process did not become ready on {host}:{port} within {timeout}s"
+        )
+
+    return _check
 
 
-def _stop(
-    proc: subprocess.Popen, sig: signal.Signals = signal.SIGTERM, wait: float = 5.0
-) -> None:
-    try:
-        proc.send_signal(sig)
-    except ProcessLookupError:
-        return
-    try:
-        proc.wait(timeout=wait)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait()
+def make_worker(
+    host: str,
+    port: int,
+    key_space: int,
+    value_size: int,
+    set_ratio: float,
+    del_ratio: float,
+):
+    """Return an async worker closed over all KVC connection and workload parameters."""
+    val = "x" * value_size
+
+    async def _worker(n_requests: int, n_warmup: int) -> None:
+        reader, writer = await asyncio.open_connection(host, port)
+        sock = writer.transport.get_extra_info("socket")
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+
+        for i in range(n_warmup):
+            writer.write(f"SET k{i % key_space} {val}\n".encode())
+            await writer.drain()
+            await reader.readline()
+
+        for _ in range(n_requests):
+            key = f"k{random.randrange(key_space)}"
+            r = random.random()
+            t0 = time.perf_counter_ns()
+            try:
+                if r < set_ratio:
+                    writer.write(f"SET {key} {val}\n".encode())
+                elif r < set_ratio + del_ratio:
+                    writer.write(f"DEL {key}\n".encode())
+                else:
+                    writer.write(f"GET {key}\n".encode())
+                await writer.drain()
+                await reader.readline()
+            except Exception:
+                print("Error during request:", file=sys.stderr)
+            else:
+                print(time.perf_counter_ns() - t0)
+
+        writer.close()
+        await writer.wait_closed()
+
+    return _worker
+
+
+async def _run(n_requests: int, n_warmup: int, n_workers: int, worker_fn) -> float:
+    n_per = n_requests // n_workers
+    t0 = time.monotonic()
+    await asyncio.gather(*(worker_fn(n_per, n_warmup) for _ in range(n_workers)))
+    return time.monotonic() - t0
 
 
 def main() -> None:
@@ -72,93 +110,28 @@ def main() -> None:
     args = p.parse_args()
 
     output = Path(args.output)
-    perf_data = output / "perf.data"
 
-    # ------------------------------------------------------------------
-    # 1. Server — core 0
-    # ------------------------------------------------------------------
-    server = subprocess.Popen(
+    worker = make_worker(
+        "127.0.0.1",
+        8080,
+        args.key_space,
+        args.value_size,
+        args.set_ratio,
+        args.del_ratio,
+    )
+
+    with po.Process(
         ["taskset", "-c", "0", "./build/kvc.o", "8080", "16384"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    _wait_for_server()
+        perf_stat=True,
+        perf_record=True,
+        record_output=output / "perf.data",
+        ready=tcp_ready(port=8080),
+    ) as server:
+        result = asyncio.run(_run(args.requests, args.warmup, args.connections, worker))
 
-    perf_record = po.PerfRecord(server.pid, perf_data)
-    bench_result: dict = {}
-
-    try:
-        # ------------------------------------------------------------------
-        # 2. perf record
-        # ------------------------------------------------------------------
-        perf_record.start()
-
-        # ------------------------------------------------------------------
-        # 3. Benchmark
-        # ------------------------------------------------------------------
-        worker = make_worker(
-            "127.0.0.1",
-            8080,
-            args.key_space,
-            args.value_size,
-            args.set_ratio,
-            args.del_ratio,
-        )
-        bench_result = po.run(
-            argparse.Namespace(
-                requests=args.requests,
-                workers=args.connections,
-                warmup=args.warmup,
-                label=args.label,
-                perf_pid=server.pid,
-            ),
-            worker,
-        )
-        po.print_result(bench_result)
-
-    finally:
-        perf_err = perf_record.stop()
-        if perf_err:
-            print(f"[perf record] {perf_err}", file=sys.stderr)
-        _stop(server)
-
-    # ------------------------------------------------------------------
-    # 4. Post-processing
-    # ------------------------------------------------------------------
-    print("\n==> Generating perf report...")
-    report = perf_record.report()
-
-    print("==> Generating flamegraph...")
-    fg = perf_record.flamegraph(_FG_COLLAPSE, _FG_RENDER)
-
-    # ------------------------------------------------------------------
-    # 5. Write output files
-    # ------------------------------------------------------------------
-    (output / "bench.json").write_text(json.dumps(bench_result, indent=2))
-    (output / "perf-report.txt").write_text(report)
-    if fg:
-        (output / "flamegraph.svg").write_bytes(fg)
-
-    (output / "meta.json").write_text(
-        json.dumps(
-            {
-                "run_id": args.run_id,
-                "label": args.label,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "git_commit": args.git_commit,
-                "bench": {
-                    "requests": args.requests,
-                    "connections": args.connections,
-                    "warmup": args.warmup,
-                    "key_space": args.key_space,
-                    "value_size": args.value_size,
-                    "set_ratio": args.set_ratio,
-                    "del_ratio": args.del_ratio,
-                },
-            },
-            indent=2,
-        )
-    )
+    server_report = server.report()
+    print(server_report)
+    print(result)
 
 
 if __name__ == "__main__":

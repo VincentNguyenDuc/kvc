@@ -45,13 +45,15 @@ bench-build:
 	docker build --target bench -t kvc-bench .
 
 bench:
-	python3 bench/run.py $(BENCH_ARGS)
+	bash bench/run.sh $(BENCH_ARGS)
 
 clean:
 	rm -rf $(BUILD_DIR)
 
 format:
 	clang-format -i $(FMT_FILES)
+	ruff format bench/
+	black bench/
 
 format-check:
 	clang-format --dry-run --Werror $(FMT_FILES)
