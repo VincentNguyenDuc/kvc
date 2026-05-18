@@ -133,7 +133,12 @@ def _aggregate(
     all_timings.sort()
     total = len(all_timings)
     pcts = [
-        ("min", 0), ("p50", 50), ("p95", 95), ("p99", 99), ("p999", 99.9), ("max", 100)
+        ("min", 0),
+        ("p50", 50),
+        ("p95", 95),
+        ("p99", 99),
+        ("p999", 99.9),
+        ("max", 100),
     ]
     timing_us = {k: round(_percentile(all_timings, p), 1) for k, p in pcts}
 
@@ -168,12 +173,17 @@ def main() -> None:
     output = Path(args.output)
     binary = Path(f"./build/{args.version}/kvc.o")
     if not binary.exists():
-        sys.exit(f"error: binary not found: {binary} — was the image built with VERSION={args.version}?")
+        sys.exit(
+            f"error: binary not found: {binary} — was the image built with VERSION={args.version}?"
+        )
 
     worker = _make_worker(
-        "127.0.0.1", 8080,
-        args.key_space, args.value_size,
-        args.set_ratio, args.del_ratio,
+        "127.0.0.1",
+        8080,
+        args.key_space,
+        args.value_size,
+        args.set_ratio,
+        args.del_ratio,
     )
 
     with po.Process(
