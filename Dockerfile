@@ -34,12 +34,13 @@ CMD ["bash"]
 
 # Run stage with only the necessary files to run the application
 FROM base AS run
+ARG VERSION=v1_baseline
 COPY . /workspace
-RUN make clean && make
+RUN make VERSION=${VERSION}
 EXPOSE 8080
-CMD ["./build/kvc.o", "8080", "1024"]
+CMD ["sh", "-c", "exec ./build/${VERSION}/kvc.o 8080 1024"]
 
-# Bench stage: server binary + Python3 benchmark client + perf + taskset
+# Bench stage: server binaries (all versions) + Python3 benchmark client + perf + taskset
 #
 # Built with -fno-omit-frame-pointer so perf can unwind call stacks via frame
 # pointers (--call-graph fp) without the overhead of DWARF unwinding.
@@ -55,5 +56,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 COPY . /workspace
 RUN pip3 install --break-system-packages /workspace/tools/perf-orchestrator
-RUN make clean && make CFLAGS="-O2 -g -Wall -Wextra -Wpedantic -fno-omit-frame-pointer"
+RUN for v in src/*/; do \
+        make VERSION="$(basename "$v")" CFLAGS="-O2 -g -Wall -Wextra -Wpedantic -fno-omit-frame-pointer"; \
+    done
 CMD ["python3", "bench/_entrypoint.py"]

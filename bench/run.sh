@@ -7,6 +7,7 @@ OUTPUT_BASE="$SCRIPT_DIR/output"
 IMAGE="kvc-bench"
 
 # Defaults
+VERSION="v1_baseline"
 LABEL=""
 REQUESTS=100000
 CONNECTIONS=1
@@ -22,9 +23,10 @@ usage() {
 Usage: bench/run.sh [OPTIONS]
 
 Builds the bench image, runs the full benchmark + perf pipeline, and writes
-results to bench/output/<run-id>/.
+results to bench/output/<version>/<run-id>/.
 
 Options:
+  --version STR       implementation version    (default: v1_baseline)
   --label STR         human-readable label for this run
   --requests N        total requests            (default: 100000)
   --connections N     concurrent connections    (default: 1)
@@ -40,6 +42,7 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --version)     VERSION="$2";     shift 2 ;;
         --label)       LABEL="$2";       shift 2 ;;
         --requests)    REQUESTS="$2";    shift 2 ;;
         --connections) CONNECTIONS="$2"; shift 2 ;;
@@ -62,7 +65,7 @@ fi
 TS=$(date +%Y%m%d-%H%M%S)
 LABEL_SLUG="${LABEL:+${LABEL// /_}}"
 RUN_ID="${LABEL_SLUG:-bench}-${TS}"
-OUTPUT_DIR="$OUTPUT_BASE/$RUN_ID"
+OUTPUT_DIR="$OUTPUT_BASE/$VERSION/$RUN_ID"
 GIT_COMMIT=$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 mkdir -p "$OUTPUT_DIR"
@@ -72,9 +75,10 @@ if [[ "$NO_BUILD" -eq 0 ]]; then
     docker build --target bench -t "$IMAGE" "$REPO_ROOT"
 fi
 
-echo "==> Run    : $RUN_ID"
-echo "==> Output : bench/output/$RUN_ID/"
-echo "==> Env    : 2 CPUs (server=core0, client=core1), 1 GB RAM, loopback"
+echo "==> Version : $VERSION"
+echo "==> Run     : $RUN_ID"
+echo "==> Output  : bench/output/$VERSION/$RUN_ID/"
+echo "==> Env     : 2 CPUs (server=core0, client=core1), 1 GB RAM, loopback"
 echo
 
 docker run --rm \
@@ -87,6 +91,7 @@ docker run --rm \
     -v "$OUTPUT_DIR:/output" \
     "$IMAGE" \
     python3 bench/_entrypoint.py \
+        --version "$VERSION" \
         --output /output \
         --run-id "$RUN_ID" \
         --label "${LABEL:-$RUN_ID}" \
@@ -109,7 +114,7 @@ docker run --rm \
     2>/dev/null || echo "    (flamegraph skipped — perf.data missing or empty)"
 
 echo
-echo "==> bench/output/$RUN_ID/"
+echo "==> bench/output/$VERSION/$RUN_ID/"
 for f in "$OUTPUT_DIR"/*; do
     [[ -f "$f" ]] || continue
     printf "    %-22s %10d B\n" "$(basename "$f")" "$(wc -c < "$f" | tr -d ' ')"
