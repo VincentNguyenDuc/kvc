@@ -99,6 +99,15 @@ docker run --rm \
         --set-ratio "$SET_RATIO" \
         --del-ratio "$DEL_RATIO"
 
+echo "==> Generating flamegraph..."
+docker run --rm \
+    -v "$OUTPUT_DIR:/output" \
+    "$IMAGE" \
+    bash -c "perf script -i /output/perf.data \
+        | tools/FlameGraph/stackcollapse-perf.pl \
+        | tools/FlameGraph/flamegraph.pl > /output/flamegraph.svg" \
+    2>/dev/null || echo "    (flamegraph skipped — perf.data missing or empty)"
+
 echo
 echo "==> bench/output/$RUN_ID/"
 for f in "$OUTPUT_DIR"/*; do

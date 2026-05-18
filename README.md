@@ -23,10 +23,10 @@ Responses:
 
 ## Project Layout
 
-- `src/main.c` CLI entry point
-- `src/server.c` TCP + epoll event loop
-- `src/protocol.c` request parsing
-- `src/hashmap.c` in-memory key/value store
+- `src/*.c` key-value storage implementation
+- `bench/` benchmark suite — Docker orchestration, async workers, result files
+- `tools/perf-orchestrator` — custom Python library for attaching `perf` capabilities to a subprocess lifecycle; 
+  implemented alongside this project but designed to be generic and reusable across projects
 
 ## Build
 
@@ -96,17 +96,19 @@ NOT_FOUND
 
 ## Benchmarking
 
-Benchmarks run inside a Docker container for a consistent, reproducible environment. The setup is:
+Benchmarks run inside a Docker container for a consistent, reproducible environment:
 
 | Parameter | Value |
 |-----------|-------|
 | CPUs available | 2 (host cores 0–1 via `--cpuset-cpus`) |
 | Server CPU | core 0 (via `taskset`) |
-| Bench client CPU | core 1 (via `taskset`) |
+| Client CPU | core 1 (via `taskset`) |
 | RAM | 1 GB (`--memory 1g`) |
 | Swap | disabled (`--memory-swap 1g`) |
 | Network | loopback (`127.0.0.1`) — no NIC variance |
 | Hashmap buckets | 16384 |
+
+Perf is always enabled: `perf stat` (hardware counters) and `perf record` (call-stack sampling) are attached to the server process for every run.
 
 ### Run
 
@@ -123,13 +125,14 @@ make bench BENCH_ARGS="--requests 200000 --connections 4 --label 'v1 4-conn'"
 Or call the script directly for full control:
 
 ```bash
-python bench/run.py --requests 100000 --connections 1 --label "v1 baseline"
+bash bench/run.sh --requests 100000 --connections 1 --label "v1 baseline"
 ```
 
 ### Parameters
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--label` | — | Human-readable label for this run |
 | `--requests` | 100000 | Total operations (split evenly across connections) |
 | `--connections` | 1 | Concurrent TCP connections |
 | `--warmup` | 1000 | Requests sent before timing starts |
@@ -137,55 +140,25 @@ python bench/run.py --requests 100000 --connections 1 --label "v1 baseline"
 | `--value-size` | 64 | Value size in bytes |
 | `--set-ratio` | 0.15 | Fraction of SET operations |
 | `--del-ratio` | 0.05 | Fraction of DEL operations |
-| `--json` | false | Emit JSON output instead of text |
-| `--label` | — | Label printed in the report |
+| `--no-build` | false | Skip Docker image build (use cached image) |
 
 The remaining fraction (`1 - set-ratio - del-ratio`) is GET operations. The default workload is **80% GET / 15% SET / 5% DEL**.
 
-### Example output
+### Output
 
-```
-connections : 1
-requests    : 100,000  (errors: 0)
-op mix      : GET=79,872  SET=15,043  DEL=5,085
-duration    : 4.231 s
-throughput  : 23,638 ops/sec
-latency us  : min=28.4  p50=39.1  p95=52.3  p99=71.8  p999=124.6  max=891.2
-```
+Each run writes results to `bench/output/<run-id>/`:
 
-### Comparing versions
-
-Use `--label` and `--json` to capture results for each version:
-
-```bash
-python bench/run.py --label "v1" --json > results/v1.json
-python bench/run.py --label "v2" --json > results/v2.json
-```
-
-### Profiling (hardware counters + flamegraph)
-
-Pass `--with-perf` to enable server-side profiling alongside the benchmark:
-
-```bash
-python bench/run.py --with-perf --label "v1"
-```
-
-This adds Docker perf capabilities, attaches `perf stat` to the server process via
-the bench package, and runs `perf record` in parallel. After the benchmark you get:
-
-- Hardware counters: cache miss rate, IPC, CPI, branch miss rate
-- Hot-path report: top functions by CPU time (`perf report --stdio`)
-
-Add `--with-flamegraph` to also generate an interactive SVG in `bench/output/`:
-
-```bash
-python bench/run.py --with-flamegraph --label "v1"
-```
+| File | Contents |
+|------|----------|
+| `bench.json` | Throughput, latency percentiles, op counts, hardware counters |
+| `perf-report.txt` | Hot-path report from `perf report --stdio` |
+| `flamegraph.svg` | Interactive flamegraph from `perf record` call stacks |
+| `meta.json` | Run parameters, timestamp, git commit |
 
 > **Note:** hardware counters (`perf stat`) require PMU support in the Docker VM.
-> They may show zeros on some hosts (e.g. Docker Desktop on macOS). The hot-path
-> report and flamegraph work regardless.
+> They may show zeros on some hosts (e.g. Docker Desktop on macOS).
+> The hot-path report works regardless.
 
-The `perf/tools/FlameGraph/` scripts are used for SVG generation.
-`make profile-build` builds the server with debug symbols and frame pointers for
-use outside the bench Docker environment.
+### Profiling build
+
+`make profile-build` compiles with debug symbols and frame pointers (`-g -fno-omit-frame-pointer`) for use outside the bench Docker environment.
