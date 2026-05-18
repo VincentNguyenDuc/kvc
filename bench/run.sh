@@ -17,6 +17,7 @@ VALUE_SIZE=64
 SET_RATIO=0.15
 DEL_RATIO=0.05
 NO_BUILD=0
+NATIVE=0
 
 usage() {
     cat <<'EOF'
@@ -35,7 +36,9 @@ Options:
   --value-size N      value size in bytes       (default: 64)
   --set-ratio F       fraction of SET ops       (default: 0.15)
   --del-ratio F       fraction of DEL ops       (default: 0.05)
-  --no-build          skip docker build (use cached image)
+  --no-build          skip docker build / make (use existing binary)
+  --native            run directly on the host (no Docker); requires perf,
+                      python3, and perf_orchestrator installed locally
   -h, --help          show this help
 EOF
 }
@@ -52,6 +55,7 @@ while [[ $# -gt 0 ]]; do
         --set-ratio)   SET_RATIO="$2";   shift 2 ;;
         --del-ratio)   DEL_RATIO="$2";   shift 2 ;;
         --no-build)    NO_BUILD=1;       shift   ;;
+        --native)      NATIVE=1;         shift   ;;
         -h|--help)     usage; exit 0 ;;
         *) echo "error: unknown option: $1" >&2; usage >&2; exit 1 ;;
     esac
@@ -70,48 +74,89 @@ GIT_COMMIT=$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unk
 
 mkdir -p "$OUTPUT_DIR"
 
-if [[ "$NO_BUILD" -eq 0 ]]; then
-    echo "==> Building $IMAGE image..."
-    docker build --target bench -t "$IMAGE" "$REPO_ROOT"
-fi
+ENTRYPOINT_ARGS=(
+    --version    "$VERSION"
+    --run-id     "$RUN_ID"
+    --label      "${LABEL:-$RUN_ID}"
+    --git-commit "$GIT_COMMIT"
+    --requests   "$REQUESTS"
+    --connections "$CONNECTIONS"
+    --warmup     "$WARMUP"
+    --key-space  "$KEY_SPACE"
+    --value-size "$VALUE_SIZE"
+    --set-ratio  "$SET_RATIO"
+    --del-ratio  "$DEL_RATIO"
+)
 
-echo "==> Version : $VERSION"
-echo "==> Run     : $RUN_ID"
-echo "==> Output  : bench/output/$VERSION/$RUN_ID/"
-echo "==> Env     : 2 CPUs (server=core0, client=core1), 1 GB RAM, loopback"
-echo
+if [[ "$NATIVE" -eq 0 ]]; then
+    # --- Docker mode ---
+    # Mount /proc/kallsyms outside /proc so perf inside the container can
+    # resolve kernel symbols (Docker blocks bind-mounts into container /proc).
+    KALLSYMS_MOUNT=()
+    [[ -f /proc/kallsyms ]] && KALLSYMS_MOUNT=(-v /proc/kallsyms:/kallsyms:ro)
 
-docker run --rm \
-    --cpuset-cpus 0-1 \
-    --memory 1g \
-    --memory-swap 1g \
-    --cap-add=SYS_ADMIN \
-    --cap-add=PERFMON \
-    --security-opt seccomp=unconfined \
-    -v "$OUTPUT_DIR:/output" \
-    "$IMAGE" \
-    python3 bench/_entrypoint.py \
-        --version "$VERSION" \
-        --output /output \
-        --run-id "$RUN_ID" \
-        --label "${LABEL:-$RUN_ID}" \
-        --git-commit "$GIT_COMMIT" \
-        --requests "$REQUESTS" \
-        --connections "$CONNECTIONS" \
-        --warmup "$WARMUP" \
-        --key-space "$KEY_SPACE" \
-        --value-size "$VALUE_SIZE" \
-        --set-ratio "$SET_RATIO" \
-        --del-ratio "$DEL_RATIO"
+    if [[ "$NO_BUILD" -eq 0 ]]; then
+        echo "==> Building $IMAGE image..."
+        docker build --target bench -t "$IMAGE" "$REPO_ROOT"
+    fi
 
-echo "==> Generating flamegraph..."
-docker run --rm \
-    -v "$OUTPUT_DIR:/output" \
-    "$IMAGE" \
-    bash -c "perf script -i /output/perf.data \
+    echo "==> Version : $VERSION"
+    echo "==> Run     : $RUN_ID"
+    echo "==> Output  : bench/output/$VERSION/$RUN_ID/"
+    echo "==> Env     : Docker — 2 CPUs (core0+1), 1 GB RAM, loopback"
+    echo
+
+    docker run --rm \
+        --cpuset-cpus 0-1 \
+        --memory 1g \
+        --memory-swap 1g \
+        --cap-add=SYS_ADMIN \
+        --cap-add=PERFMON \
+        --security-opt seccomp=unconfined \
+        -v "$OUTPUT_DIR:/output" \
+        "${KALLSYMS_MOUNT[@]+"${KALLSYMS_MOUNT[@]}"}" \
+        "$IMAGE" \
+        python3 bench/_entrypoint.py --output /output "${ENTRYPOINT_ARGS[@]}"
+
+    echo "==> Generating flamegraph..."
+    docker run --rm \
+        -v "$OUTPUT_DIR:/output" \
+        "${KALLSYMS_MOUNT[@]+"${KALLSYMS_MOUNT[@]}"}" \
+        "$IMAGE" \
+        bash -c "KSYMS=; [[ -f /kallsyms ]] && KSYMS='--kallsyms /kallsyms'; \
+            perf script \$KSYMS -i /output/perf.data \
+            | tools/FlameGraph/stackcollapse-perf.pl \
+            | tools/FlameGraph/flamegraph.pl > /output/flamegraph.svg" \
+        2>/dev/null || echo "    (flamegraph skipped — perf.data missing or empty)"
+
+else
+    # --- Native mode ---
+    # Runs directly on the host — perf sees /proc/kallsyms natively so kernel
+    # symbols resolve without any special mount.
+    # Server is pinned to core 0 by _entrypoint.py (taskset -c 0).
+    # We pin the client Python process to core 1 via taskset.
+    if [[ "$NO_BUILD" -eq 0 ]]; then
+        echo "==> Building $VERSION (native)..."
+        make -C "$REPO_ROOT" VERSION="$VERSION" \
+            CFLAGS="-O2 -g -Wall -Wextra -Wpedantic -fno-omit-frame-pointer"
+    fi
+
+    echo "==> Version : $VERSION"
+    echo "==> Run     : $RUN_ID"
+    echo "==> Output  : bench/output/$VERSION/$RUN_ID/"
+    echo "==> Env     : Native — 2 CPUs (core0+1)"
+    echo
+
+    cd "$REPO_ROOT"
+    taskset -c 1 python3 bench/_entrypoint.py \
+        --output "$OUTPUT_DIR" "${ENTRYPOINT_ARGS[@]}"
+
+    echo "==> Generating flamegraph..."
+    perf script -i "$OUTPUT_DIR/perf.data" \
         | tools/FlameGraph/stackcollapse-perf.pl \
-        | tools/FlameGraph/flamegraph.pl > /output/flamegraph.svg" \
-    2>/dev/null || echo "    (flamegraph skipped — perf.data missing or empty)"
+        | tools/FlameGraph/flamegraph.pl > "$OUTPUT_DIR/flamegraph.svg" \
+        2>/dev/null || echo "    (flamegraph skipped — perf.data missing or empty)"
+fi
 
 echo
 echo "==> bench/output/$VERSION/$RUN_ID/"

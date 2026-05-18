@@ -145,12 +145,12 @@ static int handle_line(int fd, HashMap *map, const char *line) {
         if (value == NULL) {
             return send_response(fd, "NOT_FOUND\n");
         }
-
         char out[PROTOCOL_MAX_VALUE + 16];
-        int n = snprintf(out, sizeof(out), "VALUE %s\n", value);
-        if (n < 0 || (size_t)n >= sizeof(out)) {
-            return send_response(fd, "ERROR\n");
-        }
+        size_t vlen = strlen(value);
+        memcpy(out, "VALUE ", 6);
+        memcpy(out + 6, value, vlen);
+        out[6 + vlen] = '\n';
+        out[6 + vlen + 1] = '\0';
         return send_response(fd, out);
     }
     case CMD_DEL:
