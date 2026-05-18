@@ -2,12 +2,14 @@ CC ?= cc
 CFLAGS ?= -O2 -Wall -Wextra -Wpedantic
 LDFLAGS ?=
 
-SRC := $(wildcard src/*.c)
-HDR := $(wildcard src/*.h)
-FMT_FILES := $(SRC) $(HDR)
+VERSION ?= v1_baseline
+
+SRC := $(wildcard src/$(VERSION)/*.c)
+HDR := $(wildcard src/$(VERSION)/*.h)
+FMT_FILES := $(wildcard src/*/*.c) $(wildcard src/*/*.h)
 BUILD_DIR := build
-OBJ := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SRC))
-BIN := $(BUILD_DIR)/kvc.o
+OBJ := $(patsubst src/$(VERSION)/%.c,$(BUILD_DIR)/$(VERSION)/%.o,$(SRC))
+BIN := $(BUILD_DIR)/$(VERSION)/kvc.o
 PROFILE_CFLAGS := -O2 -g -fno-omit-frame-pointer -Wall -Wextra -Wpedantic
 
 .PHONY: all clean run
@@ -21,11 +23,10 @@ all: $(BIN)
 $(BIN): $(OBJ)
 	$(CC) $(OBJ) -o $@ $(LDFLAGS)
 
+$(BUILD_DIR)/$(VERSION):
+	mkdir -p $@
 
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
-$(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)
+$(BUILD_DIR)/$(VERSION)/%.o: src/$(VERSION)/%.c | $(BUILD_DIR)/$(VERSION)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 init:
@@ -39,7 +40,7 @@ run: $(BIN)
 
 profile-build:
 	$(MAKE) clean
-	$(MAKE) CFLAGS='$(PROFILE_CFLAGS)'
+	$(MAKE) VERSION=$(VERSION) CFLAGS='$(PROFILE_CFLAGS)'
 
 bench-build:
 	docker build --target bench -t kvc-bench .

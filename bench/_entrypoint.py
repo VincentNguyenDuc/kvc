@@ -151,6 +151,7 @@ def _aggregate(
 
 def main() -> None:
     p = argparse.ArgumentParser()
+    p.add_argument("--version", default="v1_baseline")
     p.add_argument("--output", required=True)
     p.add_argument("--run-id", default="")
     p.add_argument("--label", default="")
@@ -165,6 +166,10 @@ def main() -> None:
     args = p.parse_args()
 
     output = Path(args.output)
+    binary = Path(f"./build/{args.version}/kvc.o")
+    if not binary.exists():
+        sys.exit(f"error: binary not found: {binary} — was the image built with VERSION={args.version}?")
+
     worker = _make_worker(
         "127.0.0.1", 8080,
         args.key_space, args.value_size,
@@ -172,7 +177,7 @@ def main() -> None:
     )
 
     with po.Process(
-        ["taskset", "-c", "0", "./build/kvc.o", "8080", "16384"],
+        ["taskset", "-c", "0", f"./build/{args.version}/kvc.o", "8080", "16384"],
         perf=[po.PerfStat(), po.PerfRecord(output / "perf.data")],
         ready=_tcp_ready(port=8080),
     ) as server:
@@ -195,6 +200,7 @@ def main() -> None:
         json.dumps(
             {
                 "run_id": args.run_id,
+                "version": args.version,
                 "label": args.label,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "git_commit": args.git_commit,
