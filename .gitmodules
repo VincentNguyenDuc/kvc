@@ -1,0 +1,7 @@
+[submodule "tools/FlameGraph"]
+	path = tools/FlameGraph
+	url = https://github.com/brendangregg/FlameGraph
+    ignore = all
+[submodule "tools/perf-orchestrator"]
+	path = tools/perf-orchestrator
+	url = https://github.com/VincentNguyenDuc/perf-orchestrator.git

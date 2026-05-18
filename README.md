@@ -23,10 +23,10 @@ Responses:
 
 ## Project Layout
 
-- `src/main.c` CLI entry point
-- `src/server.c` TCP + epoll event loop
-- `src/protocol.c` request parsing
-- `src/hashmap.c` in-memory key/value store
+- `src/*.c` key-value storage implementation
+- `bench/` benchmark suite — Docker orchestration, async workers, result files
+- `tools/perf-orchestrator` — custom Python library for attaching `perf` capabilities to a subprocess lifecycle; 
+  implemented alongside this project but designed to be generic and reusable across projects
 
 ## Build
 
@@ -94,40 +94,71 @@ OK
 NOT_FOUND
 ```
 
-## Profiling (perf + FlameGraph)
+## Benchmarking
 
-Profiling scripts live in `perf/`:
+Benchmarks run inside a Docker container for a consistent, reproducible environment:
 
-- `perf/check.sh` preflight for perf permissions
-- `perf/record.sh` captures `perf.data` while running a workload
-- `perf/workload.sh` default mixed GET/SET/DEL load
-- `perf/flamegraph.sh` generates SVG flamegraph
+| Parameter | Value |
+|-----------|-------|
+| CPUs available | 2 (host cores 0–1 via `--cpuset-cpus`) |
+| Server CPU | core 0 (via `taskset`) |
+| Client CPU | core 1 (via `taskset`) |
+| RAM | 1 GB (`--memory 1g`) |
+| Swap | disabled (`--memory-swap 1g`) |
+| Network | loopback (`127.0.0.1`) — no NIC variance |
+| Hashmap buckets | 16384 |
 
-Run the full profiling flow (profile-friendly build, perf capture, flamegraph generation):
+Perf is always enabled: `perf stat` (hardware counters) and `perf record` (call-stack sampling) are attached to the server process for every run.
 
-```bash
-make perf-profile
-```
-
-This writes:
-
-- `build/perf/perf.data`
-- `build/perf/flamegraph.svg`
-- `build/perf/server.log`
-
-Run individual steps:
+### Run
 
 ```bash
-make profile-build
-make perf-check
-make perf-record
-make perf-flamegraph
+make bench
 ```
 
-If `make perf-check` fails with `Operation not permitted` in a container, start the dev container with perf capabilities, for example:
+Pass extra arguments via `BENCH_ARGS`:
 
-```text
---cap-add=SYS_ADMIN --cap-add=PERFMON --security-opt seccomp=unconfined
+```bash
+make bench BENCH_ARGS="--requests 200000 --connections 4 --label 'v1 4-conn'"
 ```
 
-You can also lower `kernel.perf_event_paranoid` on the host.
+Or call the script directly for full control:
+
+```bash
+bash bench/run.sh --requests 100000 --connections 1 --label "v1 baseline"
+```
+
+### Parameters
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--label` | — | Human-readable label for this run |
+| `--requests` | 100000 | Total operations (split evenly across connections) |
+| `--connections` | 1 | Concurrent TCP connections |
+| `--warmup` | 1000 | Requests sent before timing starts |
+| `--key-space` | 10000 | Number of unique keys |
+| `--value-size` | 64 | Value size in bytes |
+| `--set-ratio` | 0.15 | Fraction of SET operations |
+| `--del-ratio` | 0.05 | Fraction of DEL operations |
+| `--no-build` | false | Skip Docker image build (use cached image) |
+
+The remaining fraction (`1 - set-ratio - del-ratio`) is GET operations. The default workload is **80% GET / 15% SET / 5% DEL**.
+
+### Output
+
+Each run writes results to `bench/output/<run-id>/`:
+
+| File | Contents |
+|------|----------|
+| `bench.json` | Throughput, latency percentiles, op counts, hardware counters |
+| `perf-report.txt` | Hot-path report from `perf report --stdio` |
+| `flamegraph.svg` | Interactive flamegraph from `perf record` call stacks |
+| `meta.json` | Run parameters, timestamp, git commit |
+
+> **Note:** hardware counters (`perf stat`) require PMU support in the Docker VM.
+> They may show zeros on some hosts (e.g. Docker Desktop on macOS).
+> The hot-path report works regardless.
+
+### Profiling build
+
+`make profile-build` compiles with debug symbols and frame pointers (`-g -fno-omit-frame-pointer`) for use outside the bench Docker environment.
