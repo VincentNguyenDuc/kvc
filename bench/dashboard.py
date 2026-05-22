@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -192,8 +191,10 @@ def tab_overview(df: pd.DataFrame) -> None:
             "git_commit",
         ]
     ].copy()
-    display["timestamp"] = display["timestamp"].dt.strftime("%Y-%m-%d %H:%M").fillna("—")
-    st.dataframe(display, use_container_width=True, hide_index=True)
+    display["timestamp"] = (
+        display["timestamp"].dt.strftime("%Y-%m-%d %H:%M").fillna("—")
+    )
+    st.dataframe(display, width="stretch", hide_index=True)
 
     st.divider()
 
@@ -241,7 +242,7 @@ def tab_overview(df: pd.DataFrame) -> None:
             st.code(run["perf_report"], language=None)
 
     if run["flamegraph_path"]:
-        with st.expander("Flamegraph", expanded=True):
+        with st.expander("Flamegraph", expanded=False):
             svg = Path(run["flamegraph_path"]).read_text(encoding="utf-8")
             components.html(
                 f'<div style="overflow-x:auto;background:#fff;padding:8px;border-radius:6px">{svg}</div>',
@@ -278,7 +279,7 @@ def tab_trends(df: pd.DataFrame) -> None:
         title="Throughput over time",
     )
     fig_tp.update_traces(marker_size=8)
-    st.plotly_chart(fig_tp, use_container_width=True)
+    st.plotly_chart(fig_tp, width="stretch")
 
     # ── Latency percentiles ─────────────────────────────────────────────────
     lat_cols = ["p50_us", "p95_us", "p99_us", "p999_us"]
@@ -313,7 +314,7 @@ def tab_trends(df: pd.DataFrame) -> None:
         },
     )
     fig_lat.update_traces(marker_size=7)
-    st.plotly_chart(fig_lat, use_container_width=True)
+    st.plotly_chart(fig_lat, width="stretch")
 
     # ── CPU & ctx switches ──────────────────────────────────────────────────
     if df_t["cpu_pct"].notna().any():
@@ -328,7 +329,7 @@ def tab_trends(df: pd.DataFrame) -> None:
                 labels={"cpu_pct": "CPU%", "timestamp": ""},
                 title="Server CPU utilization",
             )
-            st.plotly_chart(fig_cpu, use_container_width=True)
+            st.plotly_chart(fig_cpu, width="stretch")
         with col2:
             if df_t["ctx_sw_per_req"].notna().any():
                 fig_ctx = px.line(
@@ -340,7 +341,7 @@ def tab_trends(df: pd.DataFrame) -> None:
                     labels={"ctx_sw_per_req": "ctx sw / req", "timestamp": ""},
                     title="Context switches per request",
                 )
-                st.plotly_chart(fig_ctx, use_container_width=True)
+                st.plotly_chart(fig_ctx, width="stretch")
 
 
 def tab_compare(df: pd.DataFrame) -> None:
@@ -385,7 +386,7 @@ def tab_compare(df: pd.DataFrame) -> None:
         )
         fig.update_traces(texttemplate="%{x:,.0f}", textposition="outside")
         fig.update_layout(showlegend=False)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     with col2:
         lat_cols = ["min_us", "p50_us", "p95_us", "p99_us", "p999_us", "max_us"]
@@ -410,7 +411,7 @@ def tab_compare(df: pd.DataFrame) -> None:
             labels={"pct": "", "µs": "µs", "run_label": "Run"},
             title="Latency distribution",
         )
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width="stretch")
 
     # ── CPU & ctx switches ──────────────────────────────────────────────────
     if cdf["cpu_pct"].notna().any():
@@ -428,7 +429,7 @@ def tab_compare(df: pd.DataFrame) -> None:
             )
             fig3.update_traces(texttemplate="%{x:.1f}%", textposition="outside")
             fig3.update_layout(showlegend=False)
-            st.plotly_chart(fig3, use_container_width=True)
+            st.plotly_chart(fig3, width="stretch")
         with col4:
             if cdf["ctx_sw_per_req"].notna().any():
                 fig4 = px.bar(
@@ -443,7 +444,7 @@ def tab_compare(df: pd.DataFrame) -> None:
                 )
                 fig4.update_traces(texttemplate="%{x:.3f}", textposition="outside")
                 fig4.update_layout(showlegend=False)
-                st.plotly_chart(fig4, use_container_width=True)
+                st.plotly_chart(fig4, width="stretch")
 
     # ── Summary table ───────────────────────────────────────────────────────
     st.subheader("Comparison table")
@@ -464,7 +465,7 @@ def tab_compare(df: pd.DataFrame) -> None:
     ]
     st.dataframe(
         cdf[show_cols].rename(columns={"run_label": "Run"}).set_index("Run"),
-        use_container_width=True,
+        width="stretch",
     )
 
 

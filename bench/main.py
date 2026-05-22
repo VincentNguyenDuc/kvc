@@ -46,11 +46,12 @@ logging.basicConfig(
 # Infrastructure / build helpers
 # ---------------------------------------------------------------------------
 
+
 def _collect_infra() -> dict:
     info: dict = {
-        "hostname":  platform.node(),
-        "os":        f"{platform.system()} {platform.release()}",
-        "arch":      platform.machine(),
+        "hostname": platform.node(),
+        "os": f"{platform.system()} {platform.release()}",
+        "arch": platform.machine(),
         "cpu_count": os.cpu_count(),
     }
     try:
@@ -68,7 +69,9 @@ def _get_git_commit() -> str:
     try:
         r = subprocess.run(
             ["git", "-C", str(_REPO_ROOT), "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
         return r.stdout.strip()
     except Exception:
@@ -79,7 +82,10 @@ def _build(version: str) -> None:
     print(f"==> Building {version} (native)...")
     subprocess.run(
         [
-            "make", "-C", str(_REPO_ROOT), f"VERSION={version}",
+            "make",
+            "-C",
+            str(_REPO_ROOT),
+            f"VERSION={version}",
             "CFLAGS=-O2 -g -Wall -Wextra -Wpedantic -fno-omit-frame-pointer",
         ],
         check=True,
@@ -100,11 +106,13 @@ def _generate_flamegraph(output: Path) -> None:
         )
         p2 = subprocess.run(
             ["perl", str(fg_dir / "stackcollapse-perf.pl")],
-            input=p1.stdout, capture_output=True,
+            input=p1.stdout,
+            capture_output=True,
         )
         p3 = subprocess.run(
             ["perl", str(fg_dir / "flamegraph.pl")],
-            input=p2.stdout, capture_output=True,
+            input=p2.stdout,
+            capture_output=True,
         )
         (output / "flamegraph.svg").write_bytes(p3.stdout)
     except Exception as e:
@@ -114,6 +122,7 @@ def _generate_flamegraph(output: Path) -> None:
 # ---------------------------------------------------------------------------
 # Benchmark worker
 # ---------------------------------------------------------------------------
+
 
 def _tcp_ready(
     host: str = "127.0.0.1", port: int = 8080, timeout: float = 5.0
@@ -129,6 +138,7 @@ def _tcp_ready(
         raise TimeoutError(
             f"process did not become ready on {host}:{port} within {timeout}s"
         )
+
     return _check
 
 
@@ -216,19 +226,23 @@ def _aggregate(results: list[_Result], elapsed: float, n_workers: int) -> dict:
     all_timings.sort()
     total = len(all_timings)
     pcts = [
-        ("min", 0), ("p50", 50), ("p95", 95),
-        ("p99", 99), ("p999", 99.9), ("max", 100),
+        ("min", 0),
+        ("p50", 50),
+        ("p95", 95),
+        ("p99", 99),
+        ("p999", 99.9),
+        ("max", 100),
     ]
     timing_us = {k: round(_percentile(all_timings, p), 1) for k, p in pcts}
 
     return {
-        "workers":          n_workers,
-        "total":            total,
-        "errors":           total_errors,
-        "counts":           all_counts,
-        "duration_s":       round(elapsed, 3),
+        "workers": n_workers,
+        "total": total,
+        "errors": total_errors,
+        "counts": all_counts,
+        "duration_s": round(elapsed, 3),
         "throughput_per_s": round(total / elapsed) if elapsed > 0 else 0,
-        "timing_us":        timing_us,
+        "timing_us": timing_us,
     }
 
 
@@ -236,37 +250,54 @@ def _aggregate(results: list[_Result], elapsed: float, n_workers: int) -> dict:
 # Entry point
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     p = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p.add_argument("--version",     default="v1_baseline", help="implementation version")
-    p.add_argument("--output",      default=None,  help="output dir (auto-generated under bench/output/ if omitted)")
-    p.add_argument("--run-id",      default="",    help="run identifier (auto-generated if omitted)")
-    p.add_argument("--label",       default="",    help="human-readable label")
-    p.add_argument("--git-commit",  default="",    help="git commit hash (auto-detected if omitted)")
-    p.add_argument("--env",         default="native", help="execution environment tag, e.g. native, docker, Azure-Standard_D2s_v3")
-    p.add_argument("--no-build",    action="store_true", help="skip make (binary must already exist)")
-    p.add_argument("--requests",    type=int,   default=100_000)
-    p.add_argument("--connections", type=int,   default=1)
-    p.add_argument("--warmup",      type=int,   default=1_000)
-    p.add_argument("--key-space",   type=int,   default=10_000)
-    p.add_argument("--value-size",  type=int,   default=64)
-    p.add_argument("--set-ratio",   type=float, default=0.15)
-    p.add_argument("--del-ratio",   type=float, default=0.05)
+    p.add_argument("--version", default="v1_baseline", help="implementation version")
+    p.add_argument(
+        "--output",
+        default=None,
+        help="output dir (auto-generated under bench/output/ if omitted)",
+    )
+    p.add_argument(
+        "--run-id", default="", help="run identifier (auto-generated if omitted)"
+    )
+    p.add_argument("--label", default="", help="human-readable label")
+    p.add_argument(
+        "--git-commit", default="", help="git commit hash (auto-detected if omitted)"
+    )
+    p.add_argument(
+        "--env",
+        default="native",
+        help="execution environment tag, e.g. native, docker, Azure-Standard_D2s_v3",
+    )
+    p.add_argument(
+        "--no-build", action="store_true", help="skip make (binary must already exist)"
+    )
+    p.add_argument("--requests", type=int, default=100_000)
+    p.add_argument("--connections", type=int, default=1)
+    p.add_argument("--warmup", type=int, default=1_000)
+    p.add_argument("--key-space", type=int, default=10_000)
+    p.add_argument("--value-size", type=int, default=64)
+    p.add_argument("--set-ratio", type=float, default=0.15)
+    p.add_argument("--del-ratio", type=float, default=0.05)
     args = p.parse_args()
 
     if args.set_ratio + args.del_ratio > 1.0:
         sys.exit("error: --set-ratio + --del-ratio must be <= 1.0")
 
     ts = datetime.now(timezone.utc)
-    run_id     = args.run_id    or f"bench-{ts.strftime('%Y%m%d-%H%M%S')}"
-    label      = args.label     or run_id
+    run_id = args.run_id or f"bench-{ts.strftime('%Y%m%d-%H%M%S')}"
+    label = args.label or run_id
     git_commit = args.git_commit or _get_git_commit()
 
-    output = Path(args.output) if args.output else (
-        _SCRIPT_DIR / "output" / args.version / run_id
+    output = (
+        Path(args.output)
+        if args.output
+        else (_SCRIPT_DIR / "output" / args.version / run_id)
     )
     output.mkdir(parents=True, exist_ok=True)
 
@@ -281,17 +312,25 @@ def main() -> None:
 
     binary = _REPO_ROOT / "build" / args.version / "kvc.o"
     if not binary.exists():
-        sys.exit(f"error: binary not found: {binary} — build with VERSION={args.version}")
+        sys.exit(
+            f"error: binary not found: {binary} — build with VERSION={args.version}"
+        )
 
     print(f"==> Version : {args.version}")
     print(f"==> Run     : {run_id}")
     print(f"==> Output  : {output}/")
-    print(f"==> Env     : {args.env} — server pinned to core 0, client pinned to core 1")
+    print(
+        f"==> Env     : {args.env} — server pinned to core 0, client pinned to core 1"
+    )
     print()
 
     worker = _make_worker(
-        "127.0.0.1", 8080,
-        args.key_space, args.value_size, args.set_ratio, args.del_ratio,
+        "127.0.0.1",
+        8080,
+        args.key_space,
+        args.value_size,
+        args.set_ratio,
+        args.del_ratio,
     )
 
     with po.Process(
@@ -312,29 +351,29 @@ def main() -> None:
         print(perf_record_info["stderr"], file=sys.stderr)
 
     result: dict = {
-        "run_id":     run_id,
-        "version":    args.version,
-        "label":      label,
-        "timestamp":  ts.isoformat(),
+        "run_id": run_id,
+        "version": args.version,
+        "label": label,
+        "timestamp": ts.isoformat(),
         "git_commit": git_commit,
-        "env":        args.env,
-        "infra":      _collect_infra(),
+        "env": args.env,
+        "infra": _collect_infra(),
         "config": {
-            "requests":    args.requests,
+            "requests": args.requests,
             "connections": args.connections,
-            "warmup":      args.warmup,
-            "key_space":   args.key_space,
-            "value_size":  args.value_size,
-            "set_ratio":   args.set_ratio,
-            "del_ratio":   args.del_ratio,
+            "warmup": args.warmup,
+            "key_space": args.key_space,
+            "value_size": args.value_size,
+            "set_ratio": args.set_ratio,
+            "del_ratio": args.del_ratio,
         },
-        "workers":          bench["workers"],
-        "total":            bench["total"],
-        "errors":           bench["errors"],
-        "counts":           bench["counts"],
-        "duration_s":       bench["duration_s"],
+        "workers": bench["workers"],
+        "total": bench["total"],
+        "errors": bench["errors"],
+        "counts": bench["counts"],
+        "duration_s": bench["duration_s"],
         "throughput_per_s": bench["throughput_per_s"],
-        "timing_us":        bench["timing_us"],
+        "timing_us": bench["timing_us"],
     }
     if perf_stat_data:
         result["perf"] = perf_stat_data
