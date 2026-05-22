@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # bench/azure.sh — Run the benchmark natively on a fresh Azure VM and copy results back.
 #
-# Usage: bench/azure.sh --location REGION [bench/run.sh options...]
+# Usage: bench/azure.sh --location REGION [bench/main.py options...]
 # Requires: az CLI (logged in), ssh, rsync
 set -euo pipefail
 
@@ -17,7 +17,7 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 
 usage() {
     cat <<'EOF'
-Usage: bench/azure.sh --location REGION [bench/run.sh options...]
+Usage: bench/azure.sh --location REGION [bench/main.py options...]
 
 Provisions an Azure VM, runs the benchmark natively, downloads results, then deletes the VM.
 
@@ -26,7 +26,7 @@ Options:
                         az account list-locations --query "[].name" -o tsv
   -h, --help          show this help
 
-All other options are forwarded to bench/run.sh (--version, --requests, etc.).
+All other options are forwarded to bench/main.py (--version, --requests, etc.).
 EOF
 }
 
@@ -98,9 +98,9 @@ ssh "${SSH_OPTS[@]}" "$ADMIN@$VM_IP" \
     "python3 -m pip install --break-system-packages ~/kvc/tools/perf-orchestrator"
 
 echo "==> Running benchmark..."
-BENCH_ARGS="--native"
+BENCH_ARGS="--env Azure-$VM_SIZE"
 [[ ${#PASSTHROUGH[@]} -gt 0 ]] && BENCH_ARGS+=" $(printf "%q " "${PASSTHROUGH[@]}")"
-ssh "${SSH_OPTS[@]}" "$ADMIN@$VM_IP" "cd ~/kvc && bash bench/run.sh $BENCH_ARGS"
+ssh "${SSH_OPTS[@]}" "$ADMIN@$VM_IP" "cd ~/kvc && python3 bench/main.py $BENCH_ARGS"
 
 echo "==> Downloading results..."
 rsync -az \
