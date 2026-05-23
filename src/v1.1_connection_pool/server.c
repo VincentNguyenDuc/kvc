@@ -30,11 +30,41 @@ int run_server(const ServerConfig *config) {
 #define MAX_EVENTS 128
 #define MAX_FDS 65536
 
+/*
+ * Pre-allocated pool of Client structs. Each accepted connection claims one
+ * slot from the free-list; closing it returns the slot. No malloc/free on
+ * the hot path.
+ */
+#define CLIENT_POOL_SIZE 512
+
 typedef struct Client {
     int fd;
     size_t used;
     char buffer[PROTOCOL_MAX_LINE];
 } Client;
+
+static Client g_pool[CLIENT_POOL_SIZE];
+static int g_free[CLIENT_POOL_SIZE];
+static int g_free_top;
+
+static void pool_init(void) {
+    for (int i = 0; i < CLIENT_POOL_SIZE; ++i)
+        g_free[i] = i;
+    g_free_top = CLIENT_POOL_SIZE;
+}
+
+static Client *pool_alloc(void) {
+    if (g_free_top == 0)
+        return NULL;
+    int idx = g_free[--g_free_top];
+    memset(&g_pool[idx], 0, sizeof(g_pool[idx]));
+    return &g_pool[idx];
+}
+
+static void pool_free(Client *c) {
+    int idx = (int)(c - g_pool);
+    g_free[g_free_top++] = idx;
+}
 
 static int set_nonblocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
@@ -96,7 +126,7 @@ static void close_client(int epoll_fd, Client **clients, int fd) {
     epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, NULL);
 
     if (clients[fd] != NULL) {
-        free(clients[fd]);
+        pool_free(clients[fd]);
         clients[fd] = NULL;
     }
 
@@ -145,12 +175,12 @@ static int handle_line(int fd, HashMap *map, const char *line) {
         if (value == NULL) {
             return send_response(fd, "NOT_FOUND\n");
         }
-
         char out[PROTOCOL_MAX_VALUE + 16];
-        int n = snprintf(out, sizeof(out), "VALUE %s\n", value);
-        if (n < 0 || (size_t)n >= sizeof(out)) {
-            return send_response(fd, "ERROR\n");
-        }
+        size_t vlen = strlen(value);
+        memcpy(out, "VALUE ", 6);
+        memcpy(out + 6, value, vlen);
+        out[6 + vlen] = '\n';
+        out[6 + vlen + 1] = '\0';
         return send_response(fd, out);
     }
     case CMD_DEL:
@@ -259,8 +289,9 @@ static int accept_clients(int epoll_fd, int listen_fd, Client **clients) {
             continue;
         }
 
-        Client *client = (Client *)calloc(1, sizeof(*client));
+        Client *client = pool_alloc();
         if (client == NULL) {
+            fprintf(stderr, "connection pool exhausted\n");
             close(client_fd);
             continue;
         }
@@ -272,7 +303,7 @@ static int accept_clients(int epoll_fd, int listen_fd, Client **clients) {
         ev.data.fd = client_fd;
 
         if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &ev) == -1) {
-            free(client);
+            pool_free(client);
             close(client_fd);
             continue;
         }
@@ -287,6 +318,7 @@ int run_server(const ServerConfig *config) {
     }
 
     signal(SIGPIPE, SIG_IGN);
+    pool_init();
 
     HashMap *map = hashmap_create(config->hashmap_buckets);
     if (map == NULL) {

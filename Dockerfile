@@ -59,4 +59,4 @@ RUN pip3 install --break-system-packages /workspace/tools/perf-orchestrator
 RUN for v in src/*/; do \
         make VERSION="$(basename "$v")" CFLAGS="-O2 -g -Wall -Wextra -Wpedantic -fno-omit-frame-pointer"; \
     done
-CMD ["python3", "bench/_entrypoint.py"]
+CMD ["python3", "bench/main.py"]

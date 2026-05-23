@@ -20,6 +20,9 @@ struct HashMap {
 };
 
 static uint64_t hash_key(const char *key) {
+    /*
+    FNV-1a hash algorithm for 64-bit hash values
+    */
     uint64_t hash = 1469598103934665603ULL;
 
     for (const unsigned char *p = (const unsigned char *)key; *p != '\0'; ++p) {
@@ -31,20 +34,21 @@ static uint64_t hash_key(const char *key) {
 }
 
 static Entry *entry_create(const char *key, const char *value) {
-    Entry *entry = (Entry *)calloc(1, sizeof(*entry));
+    size_t klen = strlen(key) + 1;
+    Entry *entry = malloc(sizeof(Entry) + klen);
     if (entry == NULL) {
         return NULL;
     }
 
-    entry->key = strdup(key);
     entry->value = strdup(value);
-    if (entry->key == NULL || entry->value == NULL) {
-        free(entry->key);
-        free(entry->value);
+    if (entry->value == NULL) {
         free(entry);
         return NULL;
     }
 
+    entry->key = (char *)(entry + 1);
+    memcpy(entry->key, key, klen);
+    entry->next = NULL;
     return entry;
 }
 
@@ -78,7 +82,6 @@ void hashmap_destroy(HashMap *map) {
         Entry *entry = map->buckets[i];
         while (entry != NULL) {
             Entry *next = entry->next;
-            free(entry->key);
             free(entry->value);
             free(entry);
             entry = next;
@@ -157,7 +160,6 @@ int hashmap_del(HashMap *map, const char *key) {
                 prev->next = entry->next;
             }
 
-            free(entry->key);
             free(entry->value);
             free(entry);
             map->count--;
