@@ -13,7 +13,8 @@ import plotly.express as px
 import streamlit as st
 import streamlit.components.v1 as components
 
-BENCH_DIR = Path(__file__).parent
+PROJECT_DIR = Path(__file__).parent.parent
+BENCH_DIR = PROJECT_DIR / "bench"
 OUTPUT_DIR = BENCH_DIR / "output"
 
 st.set_page_config(
@@ -494,13 +495,7 @@ Each answer feeds the next implementation. This page tracks the data behind ever
 
     st.divider()
     st.subheader("Versions")
-    st.markdown(
-        """
-| Version | Description |
-|---------|-------------|
-| `v1_baseline` | Single-threaded, blocking I/O, `fork()`-per-connection. No optimizations. Establishes the performance floor. |
-        """
-    )
+    st.markdown((PROJECT_DIR / "VERSIONS.md").read_text())
 
 
 def main() -> None:

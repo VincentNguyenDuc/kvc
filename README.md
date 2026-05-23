@@ -19,12 +19,6 @@ tools/perf-orchestrator custom Python library for perf stat/record/flamegraph
 [`tools/perf-orchestrator`](https://github.com/VincentNguyenDuc/perf-orchestrator)
 is developed alongside this project but is generic and reusable.
 
-## Implementations
-
-| Version | Description |
-|---------|-------------|
-| `v1_baseline` | Single-threaded, blocking I/O, `fork()`-per-connection. No optimizations. Establishes the performance floor. |
-
 ## Build
 
 ```bash

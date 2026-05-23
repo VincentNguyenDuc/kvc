@@ -290,7 +290,7 @@ def main() -> None:
         sys.exit("error: --set-ratio + --del-ratio must be <= 1.0")
 
     ts = datetime.now(timezone.utc)
-    run_id = args.run_id or f"bench-{ts.strftime('%Y%m%d-%H%M%S')}"
+    run_id = args.run_id or f"{args.version}-{ts.strftime('%Y%m%d-%H%M%S')}"
     label = args.label or run_id
     git_commit = args.git_commit or _get_git_commit()
 

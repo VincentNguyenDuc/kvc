@@ -1,0 +1,4 @@
+| Version                | Description                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v1_baseline`          | Single-threaded epoll, non-blocking I/O. Per-connection `calloc`/`free` for client state. Establishes the performance floor.                                  |
+| `v1.1_connection_pool` | Same as v1_baseline. Replaces per-connection `calloc`/`free` with a pre-allocated free-list pool. Isolates the cost of heap allocation on connect/disconnect. |

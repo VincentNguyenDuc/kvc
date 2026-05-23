@@ -10,6 +10,7 @@ VM="bench"
 LOCATION=""
 VM_SIZE="Standard_D2s_v3"
 IMAGE="Canonical:ubuntu-24_04-lts:server:latest"
+CUSTOM_IMAGE=false
 ADMIN="bench"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,13 +18,16 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 
 usage() {
     cat <<'EOF'
-Usage: bench/azure.sh --location REGION [bench/main.py options...]
+Usage: bench/azure.sh --location REGION [options] [bench/main.py options...]
 
 Provisions an Azure VM, runs the benchmark natively, downloads results, then deletes the VM.
 
 Options:
   --location REGION   Azure region (required). Find allowed regions with:
                         az account list-locations --query "[].name" -o tsv
+  --image IMAGE_ID    use a pre-baked managed image instead of stock Ubuntu
+                      (build one with bench/azure_build_image.sh)
+  --vm-size SIZE      override VM size (default: Standard_D2s_v3)
   -h, --help          show this help
 
 All other options are forwarded to bench/main.py (--version, --requests, etc.).
@@ -33,7 +37,9 @@ EOF
 PASSTHROUGH=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --location) LOCATION="$2"; shift 2 ;;
+        --location) LOCATION="$2";              shift 2 ;;
+        --image)    IMAGE="$2"; CUSTOM_IMAGE=true; shift 2 ;;
+        --vm-size)  VM_SIZE="$2";               shift 2 ;;
         -h|--help)  usage; exit 0 ;;
         *)          PASSTHROUGH+=("$1"); shift ;;
     esac
@@ -57,7 +63,6 @@ az vm create \
     --resource-group "$RG" \
     --name "$VM" \
     --image "$IMAGE" \
-    --security-type TrustedLaunch \
     --size "$VM_SIZE" \
     --admin-username "$ADMIN" \
     --generate-ssh-keys \
@@ -70,8 +75,11 @@ SSH_OPTS=(-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 -o S
 echo "==> Waiting for SSH at $VM_IP..."
 until ssh "${SSH_OPTS[@]}" "$ADMIN@$VM_IP" true 2>/dev/null; do sleep 5; done
 
-echo "==> Installing build tools + perf..."
-ssh "${SSH_OPTS[@]}" "$ADMIN@$VM_IP" bash -s <<'REMOTE'
+if [[ "$CUSTOM_IMAGE" == "true" ]]; then
+    echo "==> Using pre-baked image — skipping dep install."
+else
+    echo "==> Installing build tools + perf..."
+    ssh "${SSH_OPTS[@]}" "$ADMIN@$VM_IP" bash -s <<'REMOTE'
 sudo apt-get update -qq
 sudo apt-get install -y --no-install-recommends \
     build-essential python3 python3-pip \
@@ -83,6 +91,7 @@ sudo apt-get install -y --no-install-recommends "linux-tools-${KVER}" 2>/dev/nul
 echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid >/dev/null
 echo  0 | sudo tee /proc/sys/kernel/kptr_restrict        >/dev/null
 REMOTE
+fi
 
 echo "==> Uploading repo..."
 rsync -az \
