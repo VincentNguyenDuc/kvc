@@ -158,9 +158,9 @@ static int send_response(int fd, const char *msg) {
     return 0;
 }
 
-static int handle_line(int fd, HashMap *map, const char *line) {
+static int handle_line(int fd, HashMap *map, char *line, size_t len) {
     Request req;
-    if (parse_request(line, &req) != 0) {
+    if (parse_request(line, len, &req) != 0) {
         return send_response(fd, "ERROR\n");
     }
 
@@ -215,20 +215,10 @@ static int handle_client_read(int epoll_fd, Client **clients, int fd, HashMap *m
             size_t start = 0;
             for (size_t i = 0; i < client->used; ++i) {
                 if (client->buffer[i] == '\n') {
-                    char line[PROTOCOL_MAX_LINE];
-                    size_t line_len = i - start + 1;
-                    if (line_len >= sizeof(line)) {
-                        if (send_response(fd, "ERROR\n") == -1) {
-                            return -1;
-                        }
-                        start = i + 1;
-                        continue;
-                    }
+                    size_t line_len = i - start;
+                    client->buffer[i] = '\0';
 
-                    memcpy(line, client->buffer + start, line_len);
-                    line[line_len] = '\0';
-
-                    if (handle_line(fd, map, line) == -1) {
+                    if (handle_line(fd, map, client->buffer + start, line_len) == -1) {
                         return -1;
                     }
 

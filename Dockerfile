@@ -25,10 +25,14 @@ RUN apt-get update \
         curl \
         git \
         linux-perf \
+        python3 \
+        python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://starship.rs/install.sh | sh -s -- -y \
    && echo 'eval "$(starship init bash)"' >> /etc/bash.bashrc
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 CMD ["bash"]
 

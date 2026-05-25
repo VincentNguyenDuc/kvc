@@ -1,0 +1,27 @@
+{
+    "name": "kvc dev",
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "target": "dev"
+    },
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+    "workspaceFolder": "/workspace",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "anthropic.claude-code",
+                "donjayamanne.python-extension-pack",
+                "ms-python.python",
+                "ms-vscode.cpptools",
+                "ms-vscode.makefile-tools",
+                "njpwerner.autodocstring"
+            ],
+            "settings": {
+                "editor.formatOnSave": true,
+                "C_Cpp.default.compilerPath": "/usr/bin/cc",
+                "C_Cpp.default.cStandard": "c11"
+            }
+        }
+    },
+    "remoteUser": "root"
+}

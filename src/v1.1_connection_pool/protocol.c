@@ -1,127 +1,117 @@
 #include "protocol.h"
 
-#include <ctype.h>
 #include <string.h>
 
-static char *skip_spaces(char *s) {
-    while (*s != '\0' && isspace((unsigned char)*s)) {
-        s++;
-    }
-    return s;
-}
-
-int parse_request(const char *line, Request *out) {
-    if (line == NULL || out == NULL) {
+int parse_request(char *line, size_t len, Request *out) {
+    if (line == NULL || out == NULL)
         return -1;
-    }
 
-    memset(out, 0, sizeof(*out));
+    /* caller replaced \n with \0; strip a trailing \r if present */
+    if (len > 0 && line[len - 1] == '\r')
+        line[--len] = '\0';
 
-    char buf[PROTOCOL_MAX_LINE];
-    size_t n = strlen(line);
-    if (n >= sizeof(buf)) {
+    if (len == 0)
         return -1;
-    }
 
-    memcpy(buf, line, n + 1);
-    while (n > 0 && (buf[n - 1] == '\n' || buf[n - 1] == '\r')) {
-        buf[n - 1] = '\0';
-        n--;
-    }
+    char *end = line + len;
+    char *p = line;
 
-    char *cursor = skip_spaces(buf);
-    if (*cursor == '\0') {
+    while (p < end && (*p == ' ' || *p == '\t'))
+        p++;
+    if (p == end)
         return -1;
-    }
 
-    char *cmd = cursor;
-    while (*cursor != '\0' && !isspace((unsigned char)*cursor)) {
-        cursor++;
-    }
-    if (*cursor != '\0') {
-        *cursor++ = '\0';
-    }
-    cursor = skip_spaces(cursor);
+    char *cmd = p;
+    char *cmd_end = memchr(p, ' ', (size_t)(end - p));
+    size_t cmd_len = cmd_end != NULL ? (size_t)(cmd_end - cmd) : (size_t)(end - cmd);
 
-    if (strcmp(cmd, "GET") == 0) {
-        if (*cursor == '\0') {
+    if (cmd_len != 3)
+        return -1;
+
+    p = cmd_end != NULL ? cmd_end : end;
+    while (p < end && (*p == ' ' || *p == '\t'))
+        p++;
+
+    if (cmd[0] == 'G' && cmd[1] == 'E' && cmd[2] == 'T') {
+        if (p == end)
             return -1;
-        }
 
-        char *key = cursor;
-        while (*cursor != '\0' && !isspace((unsigned char)*cursor)) {
-            cursor++;
-        }
-        if (*cursor != '\0') {
-            *cursor++ = '\0';
-            cursor = skip_spaces(cursor);
-            if (*cursor != '\0') {
+        char *key = p;
+        char *key_end = memchr(p, ' ', (size_t)(end - p));
+        size_t klen;
+        if (key_end != NULL) {
+            char *trail = key_end;
+            while (trail < end && (*trail == ' ' || *trail == '\t'))
+                trail++;
+            if (trail != end)
                 return -1;
-            }
+            klen = (size_t)(key_end - key);
+        } else {
+            klen = (size_t)(end - key);
         }
-
-        if (strlen(key) >= sizeof(out->key)) {
+        if (klen == 0 || klen >= sizeof(out->key))
             return -1;
-        }
 
+        memcpy(out->key, key, klen);
+        out->key[klen] = '\0';
         out->type = CMD_GET;
-        strcpy(out->key, key);
         return 0;
     }
 
-    if (strcmp(cmd, "DEL") == 0) {
-        if (*cursor == '\0') {
+    if (cmd[0] == 'D' && cmd[1] == 'E' && cmd[2] == 'L') {
+        if (p == end)
             return -1;
-        }
 
-        char *key = cursor;
-        while (*cursor != '\0' && !isspace((unsigned char)*cursor)) {
-            cursor++;
-        }
-        if (*cursor != '\0') {
-            *cursor++ = '\0';
-            cursor = skip_spaces(cursor);
-            if (*cursor != '\0') {
+        char *key = p;
+        char *key_end = memchr(p, ' ', (size_t)(end - p));
+        size_t klen;
+        if (key_end != NULL) {
+            char *trail = key_end;
+            while (trail < end && (*trail == ' ' || *trail == '\t'))
+                trail++;
+            if (trail != end)
                 return -1;
-            }
+            klen = (size_t)(key_end - key);
+        } else {
+            klen = (size_t)(end - key);
         }
-
-        if (strlen(key) >= sizeof(out->key)) {
+        if (klen == 0 || klen >= sizeof(out->key))
             return -1;
-        }
 
+        memcpy(out->key, key, klen);
+        out->key[klen] = '\0';
         out->type = CMD_DEL;
-        strcpy(out->key, key);
         return 0;
     }
 
-    if (strcmp(cmd, "SET") == 0) {
-        if (*cursor == '\0') {
+    if (cmd[0] == 'S' && cmd[1] == 'E' && cmd[2] == 'T') {
+        if (p == end)
             return -1;
-        }
 
-        char *key = cursor;
-        while (*cursor != '\0' && !isspace((unsigned char)*cursor)) {
-            cursor++;
-        }
-
-        if (*cursor == '\0') {
+        char *key = p;
+        char *key_end = memchr(p, ' ', (size_t)(end - p));
+        if (key_end == NULL)
             return -1;
-        }
 
-        *cursor++ = '\0';
-        cursor = skip_spaces(cursor);
-        if (*cursor == '\0') {
+        size_t klen = (size_t)(key_end - key);
+        if (klen == 0 || klen >= sizeof(out->key))
             return -1;
-        }
 
-        if (strlen(key) >= sizeof(out->key) || strlen(cursor) >= sizeof(out->value)) {
+        char *val = key_end;
+        while (val < end && (*val == ' ' || *val == '\t'))
+            val++;
+        if (val == end)
             return -1;
-        }
 
+        size_t vlen = (size_t)(end - val);
+        if (vlen >= sizeof(out->value))
+            return -1;
+
+        memcpy(out->key, key, klen);
+        out->key[klen] = '\0';
+        memcpy(out->value, val, vlen);
+        out->value[vlen] = '\0';
         out->type = CMD_SET;
-        strcpy(out->key, key);
-        strcpy(out->value, cursor);
         return 0;
     }
 
