@@ -1,7 +1,7 @@
 {
     "name": "kvc dev",
     "build": {
-        "dockerfile": "../Dockerfile",
+        "dockerfile": "Dockerfile",
         "target": "dev"
     },
     "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
@@ -10,10 +10,12 @@
         "vscode": {
             "extensions": [
                 "anthropic.claude-code",
-                "donjayamanne.python-extension-pack",
                 "ms-python.python",
                 "ms-vscode.cpptools",
+                "ms-vscode.cpptools-extension-pack",
+                "ms-vscode.cpp-devtools",
                 "ms-vscode.makefile-tools",
+                "xaver.clang-format",
                 "njpwerner.autodocstring"
             ],
             "settings": {
