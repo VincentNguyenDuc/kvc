@@ -23,6 +23,7 @@ WORKDIR /workspace
 FROM base AS dev
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        openssh-client \
         curl \
         git \
         linux-perf \

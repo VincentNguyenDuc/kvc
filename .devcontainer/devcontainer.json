@@ -21,12 +21,13 @@
             "settings": {
                 "editor.formatOnSave": true,
                 "C_Cpp.default.compilerPath": "/usr/bin/cc",
-                "C_Cpp.default.cStandard": "c11"
+                "C_Cpp.default.cStandard": "c11",
+                "C_Cpp.default.cppStandard": "c++17"
             }
         }
     },
     "remoteUser": "root",
     "mounts": [
-        "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+        "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
     ]
 }
