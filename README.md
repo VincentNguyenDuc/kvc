@@ -53,18 +53,9 @@ Key options:
 | `--set-ratio` | `0.15` | Fraction of SET operations |
 | `--del-ratio` | `0.05` | Fraction of DEL operations |
 | `--label` | | Human-readable run label |
-| `--env` | `native` | Environment tag (e.g. `docker`, `Azure-Standard_D2s_v3`) |
+| `--env` | `native` | Environment tag (e.g. `Azure-Standard_D2s_v3`) |
 | `--no-build` | | Skip `make` (binary must already exist) |
 | `--output` | auto | Output directory (defaults to `bench/output/<version>/<run-id>/`) |
-
-### Docker
-
-```bash
-bash bench/docker.sh
-```
-
-Builds a Linux container, runs the full pipeline with `--cpuset-cpus 0-1`,
-writes results to `bench/output/`.
 
 ### Azure
 

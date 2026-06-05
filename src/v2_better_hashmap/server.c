@@ -166,7 +166,7 @@ static int handle_line(int fd, HashMap *map, char *line, size_t len) {
 
     switch (req.type) {
     case CMD_SET:
-        if (hashmap_set(map, req.key, req.value) < 0) {
+        if (hashmap_set(map, req.key, req.value, 0) < 0) {
             return send_response(fd, "ERROR\n");
         }
         return send_response(fd, "OK\n");
@@ -310,7 +310,7 @@ int run_server(const ServerConfig *config) {
     signal(SIGPIPE, SIG_IGN);
     pool_init();
 
-    HashMap *map = hashmap_create(config->hashmap_buckets);
+    HashMap *map = hashmap_create(config->hashmap_capacity, config->hashmap_buckets);
     if (map == NULL) {
         fprintf(stderr, "failed to create hashmap\n");
         return 1;
