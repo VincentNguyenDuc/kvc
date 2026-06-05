@@ -8,12 +8,18 @@ How far can I optimize an in-memory key-value store? Each version answers a
 specific question, the benchmarks quantify the answer, and the next version
 picks up from there.
 
+## Versions
+
+See [`VERSIONS.md`](VERSIONS.md) for the full list.
+
 ## Project layout
 
 ```
 src/<version>/          one directory per implementation (e.g. v1_baseline)
 bench/                  benchmark suite — orchestration, profiling, dashboard
 tools/perf-orchestrator custom Python library for perf stat/record/flamegraph
+CMakeLists.txt          top-level CMake build (all versions)
+Makefile                convenience targets (format, lint, init)
 ```
 
 [`tools/perf-orchestrator`](https://github.com/VincentNguyenDuc/perf-orchestrator)
@@ -22,8 +28,8 @@ is developed alongside this project but is generic and reusable.
 ## Build
 
 ```bash
-make                      # build v1_baseline (default)
-make VERSION=v2_foo       # build a specific version
+cmake -B build -DCMAKE_BUILD_TYPE=Release   # configure (all versions)
+cmake --build build                          # build all versions in parallel
 ```
 
 Artifacts land in `build/<version>/kvc`.
@@ -33,9 +39,9 @@ Artifacts land in `build/<version>/kvc`.
 ### Native (recommended for accurate perf counters)
 
 ```bash
-python3 bench/main.py                                  # v1_baseline, 1 connection
+python3 bench/main.py                                               # v1_baseline, 1 connection
 python3 bench/main.py --connections 4 --requests 200000
-python3 bench/main.py --version v2_foo --label "v2 attempt"
+python3 bench/main.py --version v2_better_hashmap --label "v2 run"
 ```
 
 Output is auto-generated under `bench/output/<version>/<run-id>/`.
@@ -54,7 +60,7 @@ Key options:
 | `--del-ratio` | `0.05` | Fraction of DEL operations |
 | `--label` | | Human-readable run label |
 | `--env` | `native` | Environment tag (e.g. `Azure-Standard_D2s_v3`) |
-| `--no-build` | | Skip `make` (binary must already exist) |
+| `--no-build` | | Skip build step (binary must already exist) |
 | `--output` | auto | Output directory (defaults to `bench/output/<version>/<run-id>/`) |
 
 ### Azure
