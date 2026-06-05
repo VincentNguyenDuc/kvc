@@ -1,8 +1,8 @@
 {
-    "name": "kvc dev",
+    "name": "kvc",
     "build": {
         "dockerfile": "Dockerfile",
-        "target": "dev"
+        "target": "base"
     },
     "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
     "workspaceFolder": "/workspace",

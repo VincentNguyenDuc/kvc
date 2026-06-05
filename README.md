@@ -1,6 +1,6 @@
 # kvc
 
-Key-Value Storage in C.
+Key-Value Storage in C/C++.
 
 ## Goal
 
