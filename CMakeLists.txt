@@ -1,16 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 project(kvc C CXX)
 
-# Default to Release if not specified
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
-endif()
-
-# Match Makefile's -O2 default for Release
 set(CMAKE_C_FLAGS_RELEASE   "-O2 -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
 
-# RelWithDebInfo = profile build: matches Makefile's profile-build target
+set(CMAKE_C_FLAGS_DEBUG   "-O0 -g")
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
+
+# RelWithDebInfo = profile build: optimized with frame pointers for flamegraphs
 set(CMAKE_C_FLAGS_RELWITHDEBINFO   "-O2 -g -fno-omit-frame-pointer")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g -fno-omit-frame-pointer")
 

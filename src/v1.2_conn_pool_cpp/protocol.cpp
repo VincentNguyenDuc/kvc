@@ -22,8 +22,8 @@ int parse_request(char *line, size_t len, Request &out) {
 
     char *cmd = p;
     char *cmd_end = static_cast<char *>(memchr(p, ' ', static_cast<size_t>(end - p)));
-    size_t cmd_len = cmd_end != nullptr ? static_cast<size_t>(cmd_end - cmd)
-                                        : static_cast<size_t>(end - cmd);
+    size_t cmd_len =
+        cmd_end != nullptr ? static_cast<size_t>(cmd_end - cmd) : static_cast<size_t>(end - cmd);
 
     if (cmd_len != 3)
         return -1;

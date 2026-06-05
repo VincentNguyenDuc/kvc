@@ -10,7 +10,7 @@ static constexpr size_t HASHMAP_MAX_KEY = 256;
 static constexpr size_t HASHMAP_MAX_VAL = 3072;
 
 class HashMap {
-public:
+  public:
     HashMap(size_t capacity, size_t bucket_count);
 
     // ttl_seconds == 0 means no expiry. Returns 1 (inserted), 0 (updated), -1 (error).
@@ -19,7 +19,7 @@ public:
     bool del(const char *key);
     size_t count() const;
 
-private:
+  private:
     struct Entry {
         std::string value;
         time_t expires_at;

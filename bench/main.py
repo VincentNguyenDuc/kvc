@@ -78,16 +78,20 @@ def _get_git_commit() -> str:
         return "unknown"
 
 
+def _cmake_target(version: str) -> str:
+    return "kvc_" + version.replace(".", "_")
+
+
 def _build(version: str) -> None:
-    print(f"==> Building {version} (native)...")
+    print(f"==> Building {version} (profile)...")
     subprocess.run(
-        [
-            "make",
-            "-C",
-            str(_REPO_ROOT),
-            f"VERSION={version}",
-            "CFLAGS=-O2 -g -Wall -Wextra -Wpedantic -fno-omit-frame-pointer",
-        ],
+        ["cmake", "--preset", "profile"],
+        cwd=str(_REPO_ROOT),
+        check=True,
+    )
+    subprocess.run(
+        ["cmake", "--build", "--preset", "profile", "--target", _cmake_target(version)],
+        cwd=str(_REPO_ROOT),
         check=True,
     )
 
@@ -310,10 +314,14 @@ def main() -> None:
     except (AttributeError, OSError):
         pass
 
-    binary = _REPO_ROOT / "build" / args.version / "kvc.o"
+    binary = _REPO_ROOT / "build" / "profile" / args.version / "kvc"
     if not binary.exists():
         sys.exit(
-            f"error: binary not found: {binary} — build with VERSION={args.version}"
+            (
+                f"error: binary not found: {binary} — run: "
+                f"cmake --preset profile && "
+                f"cmake --build --preset profile --target {_cmake_target(args.version)}"
+            )
         )
 
     print(f"==> Version : {args.version}")

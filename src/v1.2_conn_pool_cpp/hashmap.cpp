@@ -67,6 +67,4 @@ bool HashMap::del(const char *key) {
     return data_.erase(key) > 0;
 }
 
-size_t HashMap::count() const {
-    return data_.size();
-}
+size_t HashMap::count() const { return data_.size(); }

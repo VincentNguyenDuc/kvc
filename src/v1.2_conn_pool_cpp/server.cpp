@@ -180,8 +180,8 @@ static int handle_client_read(int epoll_fd, Client **clients, int fd, HashMap &m
             client->used = 0;
         }
 
-        ssize_t n = recv(fd, client->buffer + client->used,
-                         sizeof(client->buffer) - client->used, 0);
+        ssize_t n =
+            recv(fd, client->buffer + client->used, sizeof(client->buffer) - client->used, 0);
         if (n > 0) {
             client->used += static_cast<size_t>(n);
 
