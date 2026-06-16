@@ -14,30 +14,30 @@ typedef struct Entry {
     time_t expires_at; /* 0 = no expiry */
     int occupied;
     size_t bucket_idx;
-    struct Entry *next; /* doubly-linked bucket chain for O(1) removal */
-    struct Entry *prev;
+    struct Entry* next; /* doubly-linked bucket chain for O(1) removal */
+    struct Entry* prev;
 } Entry;
 
 struct HashMap {
-    Arena *arena;
-    Entry *slots;    /* ring buffer slab, allocated from arena */
-    Entry **buckets; /* pointer table, allocated from arena */
+    Arena* arena;
+    Entry* slots;    /* ring buffer slab, allocated from arena */
+    Entry** buckets; /* pointer table, allocated from arena */
     size_t bucket_count;
     size_t capacity;
     size_t count;
     size_t ring_head; /* next slot to evict/fill (FIFO) */
 };
 
-static uint64_t hash_key(const char *key) {
+static uint64_t hash_key(const char* key) {
     uint64_t h = 1469598103934665603ULL;
-    for (const unsigned char *p = (const unsigned char *)key; *p; ++p) {
+    for (const unsigned char* p = (const unsigned char*)key; *p; ++p) {
         h ^= (uint64_t)(*p);
         h *= 1099511628211ULL;
     }
     return h;
 }
 
-static void bucket_remove(HashMap *map, Entry *e) {
+static void bucket_remove(HashMap* map, Entry* e) {
     if (e->prev)
         e->prev->next = e->next;
     else
@@ -47,7 +47,7 @@ static void bucket_remove(HashMap *map, Entry *e) {
     e->next = e->prev = NULL;
 }
 
-static void bucket_insert(HashMap *map, Entry *e, size_t idx) {
+static void bucket_insert(HashMap* map, Entry* e, size_t idx) {
     e->bucket_idx = idx;
     e->prev = NULL;
     e->next = map->buckets[idx];
@@ -56,30 +56,30 @@ static void bucket_insert(HashMap *map, Entry *e, size_t idx) {
     map->buckets[idx] = e;
 }
 
-static Entry *bucket_find(HashMap *map, const char *key, size_t idx) {
-    for (Entry *e = map->buckets[idx]; e; e = e->next)
+static Entry* bucket_find(HashMap* map, const char* key, size_t idx) {
+    for (Entry* e = map->buckets[idx]; e; e = e->next)
         if (strcmp(e->key, key) == 0)
             return e;
     return NULL;
 }
 
-HashMap *hashmap_create(size_t capacity, size_t bucket_count) {
+HashMap* hashmap_create(size_t capacity, size_t bucket_count) {
     if (capacity == 0 || bucket_count == 0)
         return NULL;
 
-    size_t arena_size = capacity * sizeof(Entry) + bucket_count * sizeof(Entry *);
-    Arena *arena = arena_create(arena_size);
+    size_t arena_size = capacity * sizeof(Entry) + bucket_count * sizeof(Entry*);
+    Arena* arena = arena_create(arena_size);
     if (!arena)
         return NULL;
 
-    HashMap *map = calloc(1, sizeof(*map));
+    HashMap* map = calloc(1, sizeof(*map));
     if (!map) {
         arena_destroy(arena);
         return NULL;
     }
 
     map->slots = arena_alloc_aligned(arena, capacity * sizeof(Entry), _Alignof(Entry));
-    map->buckets = arena_alloc_aligned(arena, bucket_count * sizeof(Entry *), _Alignof(Entry *));
+    map->buckets = arena_alloc_aligned(arena, bucket_count * sizeof(Entry*), _Alignof(Entry*));
     if (!map->slots || !map->buckets) {
         free(map);
         arena_destroy(arena);
@@ -87,7 +87,7 @@ HashMap *hashmap_create(size_t capacity, size_t bucket_count) {
     }
 
     memset(map->slots, 0, capacity * sizeof(Entry));
-    memset(map->buckets, 0, bucket_count * sizeof(Entry *));
+    memset(map->buckets, 0, bucket_count * sizeof(Entry*));
 
     map->arena = arena;
     map->capacity = capacity;
@@ -95,14 +95,14 @@ HashMap *hashmap_create(size_t capacity, size_t bucket_count) {
     return map;
 }
 
-void hashmap_destroy(HashMap *map) {
+void hashmap_destroy(HashMap* map) {
     if (!map)
         return;
     arena_destroy(map->arena);
     free(map);
 }
 
-int hashmap_set(HashMap *map, const char *key, const char *value, time_t ttl_seconds) {
+int hashmap_set(HashMap* map, const char* key, const char* value, time_t ttl_seconds) {
     if (!map || !key || !value)
         return -1;
 
@@ -112,7 +112,7 @@ int hashmap_set(HashMap *map, const char *key, const char *value, time_t ttl_sec
         return -1;
 
     size_t idx = (size_t)(hash_key(key) % map->bucket_count);
-    Entry *e = bucket_find(map, key, idx);
+    Entry* e = bucket_find(map, key, idx);
 
     if (e) {
         memcpy(e->value, value, vlen + 1);
@@ -120,7 +120,7 @@ int hashmap_set(HashMap *map, const char *key, const char *value, time_t ttl_sec
         return 0;
     }
 
-    Entry *slot = &map->slots[map->ring_head];
+    Entry* slot = &map->slots[map->ring_head];
     map->ring_head = (map->ring_head + 1) % map->capacity;
 
     if (slot->occupied) {
@@ -138,12 +138,12 @@ int hashmap_set(HashMap *map, const char *key, const char *value, time_t ttl_sec
     return 1;
 }
 
-const char *hashmap_get(HashMap *map, const char *key) {
+const char* hashmap_get(HashMap* map, const char* key) {
     if (!map || !key)
         return NULL;
 
     size_t idx = (size_t)(hash_key(key) % map->bucket_count);
-    Entry *e = bucket_find(map, key, idx);
+    Entry* e = bucket_find(map, key, idx);
     if (!e)
         return NULL;
 
@@ -157,12 +157,12 @@ const char *hashmap_get(HashMap *map, const char *key) {
     return e->value;
 }
 
-int hashmap_del(HashMap *map, const char *key) {
+int hashmap_del(HashMap* map, const char* key) {
     if (!map || !key)
         return 0;
 
     size_t idx = (size_t)(hash_key(key) % map->bucket_count);
-    Entry *e = bucket_find(map, key, idx);
+    Entry* e = bucket_find(map, key, idx);
     if (!e)
         return 0;
 
@@ -172,4 +172,4 @@ int hashmap_del(HashMap *map, const char *key) {
     return 1;
 }
 
-size_t hashmap_count(const HashMap *map) { return map ? map->count : 0; }
+size_t hashmap_count(const HashMap* map) { return map ? map->count : 0; }

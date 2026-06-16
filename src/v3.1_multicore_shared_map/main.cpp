@@ -6,9 +6,6 @@
 
 int main(int argc, char** argv) {
     ServerConfig config;
-    config.port = 8080;
-    config.hashmap_capacity = 4096;
-    config.hashmap_buckets = 1024;
 
     if (argc >= 2) {
         char* end = nullptr;
@@ -38,6 +35,16 @@ int main(int argc, char** argv) {
             return 1;
         }
         config.hashmap_capacity = static_cast<size_t>(capacity);
+    }
+
+    if (argc >= 5) {
+        char* end = nullptr;
+        long threads = strtol(argv[4], &end, 10);
+        if (errno != 0 || end == argv[4] || *end != '\0' || threads <= 0) {
+            fprintf(stderr, "invalid thread count: %s\n", argv[4]);
+            return 1;
+        }
+        config.num_threads = static_cast<unsigned int>(threads);
     }
 
     return run_server(config);

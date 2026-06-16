@@ -12,14 +12,14 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef __linux__
-#include <sys/epoll.h>
+#    include <sys/epoll.h>
 #endif
 #include <sys/socket.h>
 #include <unistd.h>
 
 #ifndef __linux__
 
-int run_server(const ServerConfig *config) {
+int run_server(const ServerConfig* config) {
     (void)config;
     fprintf(stderr, "kvc requires Linux for epoll support.\n");
     return 1;
@@ -27,15 +27,15 @@ int run_server(const ServerConfig *config) {
 
 #else
 
-#define MAX_EVENTS 128
-#define MAX_FDS 65536
+#    define MAX_EVENTS 128
+#    define MAX_FDS 65536
 
 /*
  * Pre-allocated pool of Client structs. Each accepted connection claims one
  * slot from the free-list; closing it returns the slot. No malloc/free on
  * the hot path.
  */
-#define CLIENT_POOL_SIZE 512
+#    define CLIENT_POOL_SIZE 512
 
 typedef struct Client {
     int fd;
@@ -53,7 +53,7 @@ static void pool_init(void) {
     g_free_top = CLIENT_POOL_SIZE;
 }
 
-static Client *pool_alloc(void) {
+static Client* pool_alloc(void) {
     if (g_free_top == 0)
         return NULL;
     int idx = g_free[--g_free_top];
@@ -61,7 +61,7 @@ static Client *pool_alloc(void) {
     return &g_pool[idx];
 }
 
-static void pool_free(Client *c) {
+static void pool_free(Client* c) {
     int idx = (int)(c - g_pool);
     g_free[g_free_top++] = idx;
 }
@@ -103,7 +103,7 @@ static int create_listen_socket(uint16_t port) {
     addr.sin_port = htons(port);
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         perror("bind");
         close(fd);
         return -1;
@@ -118,7 +118,7 @@ static int create_listen_socket(uint16_t port) {
     return fd;
 }
 
-static void close_client(int epoll_fd, Client **clients, int fd) {
+static void close_client(int epoll_fd, Client** clients, int fd) {
     if (fd < 0 || fd >= MAX_FDS) {
         return;
     }
@@ -133,7 +133,7 @@ static void close_client(int epoll_fd, Client **clients, int fd) {
     close(fd);
 }
 
-static int send_response(int fd, const char *msg) {
+static int send_response(int fd, const char* msg) {
     size_t len = strlen(msg);
     size_t sent = 0;
 
@@ -158,7 +158,7 @@ static int send_response(int fd, const char *msg) {
     return 0;
 }
 
-static int handle_line(int fd, HashMap *map, char *line, size_t len) {
+static int handle_line(int fd, HashMap* map, char* line, size_t len) {
     Request req;
     if (parse_request(line, len, &req) != 0) {
         return send_response(fd, "ERROR\n");
@@ -171,7 +171,7 @@ static int handle_line(int fd, HashMap *map, char *line, size_t len) {
         }
         return send_response(fd, "OK\n");
     case CMD_GET: {
-        const char *value = hashmap_get(map, req.key);
+        const char* value = hashmap_get(map, req.key);
         if (value == NULL) {
             return send_response(fd, "NOT_FOUND\n");
         }
@@ -193,8 +193,8 @@ static int handle_line(int fd, HashMap *map, char *line, size_t len) {
     }
 }
 
-static int handle_client_read(int epoll_fd, Client **clients, int fd, HashMap *map) {
-    Client *client = clients[fd];
+static int handle_client_read(int epoll_fd, Client** clients, int fd, HashMap* map) {
+    Client* client = clients[fd];
     if (client == NULL) {
         return -1;
     }
@@ -253,11 +253,11 @@ static int handle_client_read(int epoll_fd, Client **clients, int fd, HashMap *m
     (void)epoll_fd;
 }
 
-static int accept_clients(int epoll_fd, int listen_fd, Client **clients) {
+static int accept_clients(int epoll_fd, int listen_fd, Client** clients) {
     for (;;) {
         struct sockaddr_in addr;
         socklen_t addr_len = sizeof(addr);
-        int client_fd = accept(listen_fd, (struct sockaddr *)&addr, &addr_len);
+        int client_fd = accept(listen_fd, (struct sockaddr*)&addr, &addr_len);
         if (client_fd == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 return 0;
@@ -279,7 +279,7 @@ static int accept_clients(int epoll_fd, int listen_fd, Client **clients) {
             continue;
         }
 
-        Client *client = pool_alloc();
+        Client* client = pool_alloc();
         if (client == NULL) {
             fprintf(stderr, "connection pool exhausted\n");
             close(client_fd);
@@ -302,7 +302,7 @@ static int accept_clients(int epoll_fd, int listen_fd, Client **clients) {
     }
 }
 
-int run_server(const ServerConfig *config) {
+int run_server(const ServerConfig* config) {
     if (config == NULL) {
         return 1;
     }
@@ -310,7 +310,7 @@ int run_server(const ServerConfig *config) {
     signal(SIGPIPE, SIG_IGN);
     pool_init();
 
-    HashMap *map = hashmap_create(config->hashmap_capacity, config->hashmap_buckets);
+    HashMap* map = hashmap_create(config->hashmap_capacity, config->hashmap_buckets);
     if (map == NULL) {
         fprintf(stderr, "failed to create hashmap\n");
         return 1;
@@ -343,7 +343,7 @@ int run_server(const ServerConfig *config) {
         return 1;
     }
 
-    Client **clients = (Client **)calloc(MAX_FDS, sizeof(*clients));
+    Client** clients = (Client**)calloc(MAX_FDS, sizeof(*clients));
     if (clients == NULL) {
         fprintf(stderr, "failed to allocate client table\n");
         close(epoll_fd);

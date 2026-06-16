@@ -9,4 +9,4 @@ struct ServerConfig {
     size_t hashmap_buckets;
 };
 
-int run_server(const ServerConfig &config);
+int run_server(const ServerConfig& config);

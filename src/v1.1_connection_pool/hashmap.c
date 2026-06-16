@@ -8,24 +8,24 @@
 #include <string.h>
 
 typedef struct Entry {
-    char *key;
-    char *value;
-    struct Entry *next;
+    char* key;
+    char* value;
+    struct Entry* next;
 } Entry;
 
 struct HashMap {
-    Entry **buckets;
+    Entry** buckets;
     size_t bucket_count;
     size_t count;
 };
 
-static uint64_t hash_key(const char *key) {
+static uint64_t hash_key(const char* key) {
     /*
     FNV-1a hash algorithm for 64-bit hash values
     */
     uint64_t hash = 1469598103934665603ULL;
 
-    for (const unsigned char *p = (const unsigned char *)key; *p != '\0'; ++p) {
+    for (const unsigned char* p = (const unsigned char*)key; *p != '\0'; ++p) {
         hash ^= (uint64_t)(*p);
         hash *= 1099511628211ULL;
     }
@@ -33,9 +33,9 @@ static uint64_t hash_key(const char *key) {
     return hash;
 }
 
-static Entry *entry_create(const char *key, const char *value) {
+static Entry* entry_create(const char* key, const char* value) {
     size_t klen = strlen(key) + 1;
-    Entry *entry = malloc(sizeof(Entry) + klen);
+    Entry* entry = malloc(sizeof(Entry) + klen);
     if (entry == NULL) {
         return NULL;
     }
@@ -46,23 +46,23 @@ static Entry *entry_create(const char *key, const char *value) {
         return NULL;
     }
 
-    entry->key = (char *)(entry + 1);
+    entry->key = (char*)(entry + 1);
     memcpy(entry->key, key, klen);
     entry->next = NULL;
     return entry;
 }
 
-HashMap *hashmap_create(size_t bucket_count) {
+HashMap* hashmap_create(size_t bucket_count) {
     if (bucket_count == 0) {
         return NULL;
     }
 
-    HashMap *map = (HashMap *)calloc(1, sizeof(*map));
+    HashMap* map = (HashMap*)calloc(1, sizeof(*map));
     if (map == NULL) {
         return NULL;
     }
 
-    map->buckets = (Entry **)calloc(bucket_count, sizeof(*map->buckets));
+    map->buckets = (Entry**)calloc(bucket_count, sizeof(*map->buckets));
     if (map->buckets == NULL) {
         free(map);
         return NULL;
@@ -73,15 +73,15 @@ HashMap *hashmap_create(size_t bucket_count) {
     return map;
 }
 
-void hashmap_destroy(HashMap *map) {
+void hashmap_destroy(HashMap* map) {
     if (map == NULL) {
         return;
     }
 
     for (size_t i = 0; i < map->bucket_count; ++i) {
-        Entry *entry = map->buckets[i];
+        Entry* entry = map->buckets[i];
         while (entry != NULL) {
-            Entry *next = entry->next;
+            Entry* next = entry->next;
             free(entry->value);
             free(entry);
             entry = next;
@@ -92,17 +92,17 @@ void hashmap_destroy(HashMap *map) {
     free(map);
 }
 
-int hashmap_set(HashMap *map, const char *key, const char *value) {
+int hashmap_set(HashMap* map, const char* key, const char* value) {
     if (map == NULL || key == NULL || value == NULL) {
         return -1;
     }
 
     size_t idx = (size_t)(hash_key(key) % map->bucket_count);
-    Entry *entry = map->buckets[idx];
+    Entry* entry = map->buckets[idx];
 
     while (entry != NULL) {
         if (strcmp(entry->key, key) == 0) {
-            char *new_value = strdup(value);
+            char* new_value = strdup(value);
             if (new_value == NULL) {
                 return -1;
             }
@@ -113,7 +113,7 @@ int hashmap_set(HashMap *map, const char *key, const char *value) {
         entry = entry->next;
     }
 
-    Entry *new_entry = entry_create(key, value);
+    Entry* new_entry = entry_create(key, value);
     if (new_entry == NULL) {
         return -1;
     }
@@ -125,13 +125,13 @@ int hashmap_set(HashMap *map, const char *key, const char *value) {
     return 1;
 }
 
-const char *hashmap_get(const HashMap *map, const char *key) {
+const char* hashmap_get(const HashMap* map, const char* key) {
     if (map == NULL || key == NULL) {
         return NULL;
     }
 
     size_t idx = (size_t)(hash_key(key) % map->bucket_count);
-    Entry *entry = map->buckets[idx];
+    Entry* entry = map->buckets[idx];
 
     while (entry != NULL) {
         if (strcmp(entry->key, key) == 0) {
@@ -143,14 +143,14 @@ const char *hashmap_get(const HashMap *map, const char *key) {
     return NULL;
 }
 
-int hashmap_del(HashMap *map, const char *key) {
+int hashmap_del(HashMap* map, const char* key) {
     if (map == NULL || key == NULL) {
         return 0;
     }
 
     size_t idx = (size_t)(hash_key(key) % map->bucket_count);
-    Entry *entry = map->buckets[idx];
-    Entry *prev = NULL;
+    Entry* entry = map->buckets[idx];
+    Entry* prev = NULL;
 
     while (entry != NULL) {
         if (strcmp(entry->key, key) == 0) {
@@ -173,7 +173,7 @@ int hashmap_del(HashMap *map, const char *key) {
     return 0;
 }
 
-size_t hashmap_count(const HashMap *map) {
+size_t hashmap_count(const HashMap* map) {
     if (map == NULL) {
         return 0;
     }
