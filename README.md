@@ -27,12 +27,29 @@ is developed alongside this project but is generic and reusable.
 
 ## Build
 
+Three presets are defined in [`CMakePresets.json`](CMakePresets.json):
+
+| Preset | Flags | Output dir | Use for |
+|--------|-------|------------|---------|
+| `release` | `-O2 -DNDEBUG` | `build/release/` | production / distribution |
+| `debug` | `-O0 -g` | `build/debug/` | debugging |
+| `profile` | `-O2 -g -fno-omit-frame-pointer` | `build/profile/` | benchmarking + flamegraphs |
+
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release   # configure (all versions)
-cmake --build build                          # build all versions in parallel
+# Configure once per preset (only needed when CMakeLists.txt changes)
+cmake --preset release
+cmake --preset debug
+cmake --preset profile
+
+# Build all versions
+cmake --build --preset release
+
+# Build a single version (target = kvc_<version> with dots replaced by underscores)
+cmake --build --preset release --target kvc_v1_baseline
+cmake --build --preset debug   --target kvc_v2_better_hashmap
 ```
 
-Artifacts land in `build/<version>/kvc`.
+Binaries land at `build/<preset>/<version>/kvc`.
 
 ## Benchmarking
 

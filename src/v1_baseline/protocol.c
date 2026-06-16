@@ -3,14 +3,14 @@
 #include <ctype.h>
 #include <string.h>
 
-static char *skip_spaces(char *s) {
+static char* skip_spaces(char* s) {
     while (*s != '\0' && isspace((unsigned char)*s)) {
         s++;
     }
     return s;
 }
 
-int parse_request(const char *line, Request *out) {
+int parse_request(const char* line, Request* out) {
     if (line == NULL || out == NULL) {
         return -1;
     }
@@ -29,12 +29,12 @@ int parse_request(const char *line, Request *out) {
         n--;
     }
 
-    char *cursor = skip_spaces(buf);
+    char* cursor = skip_spaces(buf);
     if (*cursor == '\0') {
         return -1;
     }
 
-    char *cmd = cursor;
+    char* cmd = cursor;
     while (*cursor != '\0' && !isspace((unsigned char)*cursor)) {
         cursor++;
     }
@@ -48,7 +48,7 @@ int parse_request(const char *line, Request *out) {
             return -1;
         }
 
-        char *key = cursor;
+        char* key = cursor;
         while (*cursor != '\0' && !isspace((unsigned char)*cursor)) {
             cursor++;
         }
@@ -74,7 +74,7 @@ int parse_request(const char *line, Request *out) {
             return -1;
         }
 
-        char *key = cursor;
+        char* key = cursor;
         while (*cursor != '\0' && !isspace((unsigned char)*cursor)) {
             cursor++;
         }
@@ -100,7 +100,7 @@ int parse_request(const char *line, Request *out) {
             return -1;
         }
 
-        char *key = cursor;
+        char* key = cursor;
         while (*cursor != '\0' && !isspace((unsigned char)*cursor)) {
             cursor++;
         }

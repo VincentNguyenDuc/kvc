@@ -13,10 +13,11 @@ class HashMap {
 public:
     HashMap(size_t capacity, size_t bucket_count);
 
-    // ttl_seconds == 0 means no expiry. Returns 1 (inserted), 0 (updated), -1 (error).
-    int set(const char *key, const char *value, time_t ttl_seconds);
-    const char *get(const char *key);
-    bool del(const char *key);
+    // ttl_seconds == 0 means no expiry. Returns 1 (inserted), 0 (updated), -1
+    // (error).
+    int set(const char* key, const char* value, time_t ttl_seconds);
+    const char* get(const char* key);
+    bool del(const char* key);
     size_t count() const;
 
 private:

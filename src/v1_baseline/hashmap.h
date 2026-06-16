@@ -5,12 +5,12 @@
 
 typedef struct HashMap HashMap;
 
-HashMap *hashmap_create(size_t bucket_count);
-void hashmap_destroy(HashMap *map);
+HashMap* hashmap_create(size_t bucket_count);
+void hashmap_destroy(HashMap* map);
 
-int hashmap_set(HashMap *map, const char *key, const char *value);
-const char *hashmap_get(const HashMap *map, const char *key);
-int hashmap_del(HashMap *map, const char *key);
-size_t hashmap_count(const HashMap *map);
+int hashmap_set(HashMap* map, const char* key, const char* value);
+const char* hashmap_get(const HashMap* map, const char* key);
+int hashmap_del(HashMap* map, const char* key);
+size_t hashmap_count(const HashMap* map);
 
 #endif

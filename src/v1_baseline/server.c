@@ -12,14 +12,14 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef __linux__
-#include <sys/epoll.h>
+#    include <sys/epoll.h>
 #endif
 #include <sys/socket.h>
 #include <unistd.h>
 
 #ifndef __linux__
 
-int run_server(const ServerConfig *config) {
+int run_server(const ServerConfig* config) {
     (void)config;
     fprintf(stderr, "kvc requires Linux for epoll support.\n");
     return 1;
@@ -27,8 +27,8 @@ int run_server(const ServerConfig *config) {
 
 #else
 
-#define MAX_EVENTS 128
-#define MAX_FDS 65536
+#    define MAX_EVENTS 128
+#    define MAX_FDS 65536
 
 typedef struct Client {
     int fd;
@@ -73,7 +73,7 @@ static int create_listen_socket(uint16_t port) {
     addr.sin_port = htons(port);
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+    if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         perror("bind");
         close(fd);
         return -1;
@@ -88,7 +88,7 @@ static int create_listen_socket(uint16_t port) {
     return fd;
 }
 
-static void close_client(int epoll_fd, Client **clients, int fd) {
+static void close_client(int epoll_fd, Client** clients, int fd) {
     if (fd < 0 || fd >= MAX_FDS) {
         return;
     }
@@ -103,7 +103,7 @@ static void close_client(int epoll_fd, Client **clients, int fd) {
     close(fd);
 }
 
-static int send_response(int fd, const char *msg) {
+static int send_response(int fd, const char* msg) {
     size_t len = strlen(msg);
     size_t sent = 0;
 
@@ -128,7 +128,7 @@ static int send_response(int fd, const char *msg) {
     return 0;
 }
 
-static int handle_line(int fd, HashMap *map, const char *line) {
+static int handle_line(int fd, HashMap* map, const char* line) {
     Request req;
     if (parse_request(line, &req) != 0) {
         return send_response(fd, "ERROR\n");
@@ -141,7 +141,7 @@ static int handle_line(int fd, HashMap *map, const char *line) {
         }
         return send_response(fd, "OK\n");
     case CMD_GET: {
-        const char *value = hashmap_get(map, req.key);
+        const char* value = hashmap_get(map, req.key);
         if (value == NULL) {
             return send_response(fd, "NOT_FOUND\n");
         }
@@ -163,8 +163,8 @@ static int handle_line(int fd, HashMap *map, const char *line) {
     }
 }
 
-static int handle_client_read(int epoll_fd, Client **clients, int fd, HashMap *map) {
-    Client *client = clients[fd];
+static int handle_client_read(int epoll_fd, Client** clients, int fd, HashMap* map) {
+    Client* client = clients[fd];
     if (client == NULL) {
         return -1;
     }
@@ -233,11 +233,11 @@ static int handle_client_read(int epoll_fd, Client **clients, int fd, HashMap *m
     (void)epoll_fd;
 }
 
-static int accept_clients(int epoll_fd, int listen_fd, Client **clients) {
+static int accept_clients(int epoll_fd, int listen_fd, Client** clients) {
     for (;;) {
         struct sockaddr_in addr;
         socklen_t addr_len = sizeof(addr);
-        int client_fd = accept(listen_fd, (struct sockaddr *)&addr, &addr_len);
+        int client_fd = accept(listen_fd, (struct sockaddr*)&addr, &addr_len);
         if (client_fd == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 return 0;
@@ -259,7 +259,7 @@ static int accept_clients(int epoll_fd, int listen_fd, Client **clients) {
             continue;
         }
 
-        Client *client = (Client *)calloc(1, sizeof(*client));
+        Client* client = (Client*)calloc(1, sizeof(*client));
         if (client == NULL) {
             close(client_fd);
             continue;
@@ -281,14 +281,14 @@ static int accept_clients(int epoll_fd, int listen_fd, Client **clients) {
     }
 }
 
-int run_server(const ServerConfig *config) {
+int run_server(const ServerConfig* config) {
     if (config == NULL) {
         return 1;
     }
 
     signal(SIGPIPE, SIG_IGN);
 
-    HashMap *map = hashmap_create(config->hashmap_buckets);
+    HashMap* map = hashmap_create(config->hashmap_buckets);
     if (map == NULL) {
         fprintf(stderr, "failed to create hashmap\n");
         return 1;
@@ -321,7 +321,7 @@ int run_server(const ServerConfig *config) {
         return 1;
     }
 
-    Client **clients = (Client **)calloc(MAX_FDS, sizeof(*clients));
+    Client** clients = (Client**)calloc(MAX_FDS, sizeof(*clients));
     if (clients == NULL) {
         fprintf(stderr, "failed to allocate client table\n");
         close(epoll_fd);

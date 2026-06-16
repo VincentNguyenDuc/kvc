@@ -10,11 +10,14 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <signal.h>
+#include <thread>
+#include <vector>
+
 #ifdef __linux__
 #    include <sys/epoll.h>
+#    include <sys/socket.h>
+#    include <unistd.h>
 #endif
-#include <sys/socket.h>
-#include <unistd.h>
 
 #ifndef __linux__
 
@@ -35,28 +38,30 @@ struct Client {
     char buffer[PROTOCOL_MAX_LINE];
 };
 
-static Client g_pool[CLIENT_POOL_SIZE];
-static int g_free[CLIENT_POOL_SIZE];
-static int g_free_top;
+struct WorkerPool {
+    Client slots[CLIENT_POOL_SIZE];
+    int free_list[CLIENT_POOL_SIZE];
+    int free_top{0};
 
-static void pool_init() {
-    for (int i = 0; i < CLIENT_POOL_SIZE; ++i)
-        g_free[i] = i;
-    g_free_top = CLIENT_POOL_SIZE;
-}
+    void init() {
+        for (int i = 0; i < CLIENT_POOL_SIZE; ++i)
+            free_list[i] = i;
+        free_top = CLIENT_POOL_SIZE;
+    }
 
-static Client* pool_alloc() {
-    if (g_free_top == 0)
-        return nullptr;
-    int idx = g_free[--g_free_top];
-    memset(&g_pool[idx], 0, sizeof(g_pool[idx]));
-    return &g_pool[idx];
-}
+    Client* alloc() {
+        if (free_top == 0)
+            return nullptr;
+        int idx = free_list[--free_top];
+        memset(&slots[idx], 0, sizeof(slots[idx]));
+        return &slots[idx];
+    }
 
-static void pool_free(Client* c) {
-    int idx = static_cast<int>(c - g_pool);
-    g_free[g_free_top++] = idx;
-}
+    void release(Client* c) {
+        int idx = static_cast<int>(c - slots);
+        free_list[free_top++] = idx;
+    }
+};
 
 static int set_nonblocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
@@ -65,22 +70,29 @@ static int set_nonblocking(int fd) {
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1 ? -1 : 0;
 }
 
-static int create_listen_socket(uint16_t port) {
+// Each worker thread binds its own SO_REUSEPORT socket; the kernel distributes
+// connections.
+static int create_reuseport_socket(uint16_t port) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
         perror("socket");
         return -1;
     }
 
-    int reuse = 1;
-    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1) {
+    int opt = 1;
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
         perror("setsockopt(SO_REUSEADDR)");
+        close(fd);
+        return -1;
+    }
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) == -1) {
+        perror("setsockopt(SO_REUSEPORT)");
         close(fd);
         return -1;
     }
 
     if (set_nonblocking(fd) == -1) {
-        perror("set_nonblocking(listen)");
+        perror("set_nonblocking");
         close(fd);
         return -1;
     }
@@ -105,12 +117,12 @@ static int create_listen_socket(uint16_t port) {
     return fd;
 }
 
-static void close_client(int epoll_fd, Client** clients, int fd) {
+static void close_client(int epoll_fd, Client** clients, WorkerPool& pool, int fd) {
     if (fd < 0 || fd >= MAX_FDS)
         return;
     epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr);
     if (clients[fd] != nullptr) {
-        pool_free(clients[fd]);
+        pool.release(clients[fd]);
         clients[fd] = nullptr;
     }
     close(fd);
@@ -119,7 +131,6 @@ static void close_client(int epoll_fd, Client** clients, int fd) {
 static int send_response(int fd, const char* msg) {
     size_t len = strlen(msg);
     size_t sent = 0;
-
     while (sent < len) {
         ssize_t n = send(fd, msg + sent, len - sent, MSG_NOSIGNAL);
         if (n > 0) {
@@ -132,11 +143,10 @@ static int send_response(int fd, const char* msg) {
             return 0;
         return -1;
     }
-
     return 0;
 }
 
-static int handle_line(int fd, HashMap& map, char* line, size_t len) {
+static int handle_line(int fd, SharedHashMap& map, char* line, size_t len) {
     Request req{};
     if (parse_request(line, len, req) != 0)
         return send_response(fd, "ERROR\n");
@@ -148,13 +158,13 @@ static int handle_line(int fd, HashMap& map, char* line, size_t len) {
         return send_response(fd, "OK\n");
 
     case CommandType::Get: {
-        const char* value = map.get(req.key);
-        if (value == nullptr)
+        char val_buf[HASHMAP_MAX_VAL];
+        if (!map.get(req.key, val_buf, sizeof(val_buf)))
             return send_response(fd, "NOT_FOUND\n");
-        char out[PROTOCOL_MAX_VALUE + 16];
-        size_t vlen = strlen(value);
+        char out[HASHMAP_MAX_VAL + 8];
+        size_t vlen = strlen(val_buf);
         memcpy(out, "VALUE ", 6);
-        memcpy(out + 6, value, vlen);
+        memcpy(out + 6, val_buf, vlen);
         out[6 + vlen] = '\n';
         out[6 + vlen + 1] = '\0';
         return send_response(fd, out);
@@ -168,9 +178,11 @@ static int handle_line(int fd, HashMap& map, char* line, size_t len) {
     }
 }
 
-static int handle_client_read(int epoll_fd, Client** clients, int fd, HashMap& map) {
+static int handle_client_read(
+    int epoll_fd, Client** clients, WorkerPool& pool, int fd, SharedHashMap& map
+) {
     Client* client = clients[fd];
-    if (client == nullptr)
+    if (!client)
         return -1;
 
     for (;;) {
@@ -214,9 +226,10 @@ static int handle_client_read(int epoll_fd, Client** clients, int fd, HashMap& m
     }
 
     (void)epoll_fd;
+    (void)pool;
 }
 
-static int accept_clients(int epoll_fd, int listen_fd, Client** clients) {
+static int accept_clients(int epoll_fd, int listen_fd, Client** clients, WorkerPool& pool) {
     for (;;) {
         sockaddr_in addr{};
         socklen_t addr_len = sizeof(addr);
@@ -240,8 +253,8 @@ static int accept_clients(int epoll_fd, int listen_fd, Client** clients) {
             continue;
         }
 
-        Client* client = pool_alloc();
-        if (client == nullptr) {
+        Client* client = pool.alloc();
+        if (!client) {
             fprintf(stderr, "connection pool exhausted\n");
             close(client_fd);
             continue;
@@ -253,7 +266,7 @@ static int accept_clients(int epoll_fd, int listen_fd, Client** clients) {
         ev.data.fd = client_fd;
 
         if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &ev) == -1) {
-            pool_free(client);
+            pool.release(client);
             close(client_fd);
             continue;
         }
@@ -262,21 +275,27 @@ static int accept_clients(int epoll_fd, int listen_fd, Client** clients) {
     }
 }
 
-int run_server(const ServerConfig& config) {
-    signal(SIGPIPE, SIG_IGN);
-    pool_init();
+struct WorkerArgs {
+    int id;
+    uint16_t port;
+    SharedHashMap* map;
+};
 
-    HashMap map(config.hashmap_capacity, config.hashmap_buckets);
+static void run_worker(WorkerArgs args) {
+    WorkerPool pool;
+    pool.init();
 
-    int listen_fd = create_listen_socket(config.port);
-    if (listen_fd == -1)
-        return 1;
+    int listen_fd = create_reuseport_socket(args.port);
+    if (listen_fd == -1) {
+        fprintf(stderr, "[worker %d] failed to create listen socket\n", args.id);
+        return;
+    }
 
     int epoll_fd = epoll_create1(0);
     if (epoll_fd == -1) {
         perror("epoll_create1");
         close(listen_fd);
-        return 1;
+        return;
     }
 
     epoll_event listen_ev{};
@@ -287,18 +306,16 @@ int run_server(const ServerConfig& config) {
         perror("epoll_ctl(add listen_fd)");
         close(epoll_fd);
         close(listen_fd);
-        return 1;
+        return;
     }
 
     Client** clients = static_cast<Client**>(calloc(MAX_FDS, sizeof(*clients)));
-    if (clients == nullptr) {
-        fprintf(stderr, "failed to allocate client table\n");
+    if (!clients) {
+        fprintf(stderr, "[worker %d] failed to allocate client table\n", args.id);
         close(epoll_fd);
         close(listen_fd);
-        return 1;
+        return;
     }
-
-    printf("kvc listening on 0.0.0.0:%u\n", config.port);
 
     epoll_event events[MAX_EVENTS];
     for (;;) {
@@ -315,35 +332,59 @@ int run_server(const ServerConfig& config) {
             uint32_t ev = events[i].events;
 
             if (fd == listen_fd) {
-                if (accept_clients(epoll_fd, listen_fd, clients) == -1)
-                    goto shutdown;
+                if (accept_clients(epoll_fd, listen_fd, clients, pool) == -1)
+                    goto worker_shutdown;
                 continue;
             }
 
-            if (fd < 0 || fd >= MAX_FDS || clients[fd] == nullptr)
+            if (fd < 0 || fd >= MAX_FDS || !clients[fd])
                 continue;
 
             if ((ev & (EPOLLERR | EPOLLHUP | EPOLLRDHUP)) != 0U) {
-                close_client(epoll_fd, clients, fd);
+                close_client(epoll_fd, clients, pool, fd);
                 continue;
             }
 
             if ((ev & EPOLLIN) != 0U) {
-                if (handle_client_read(epoll_fd, clients, fd, map) == -1)
-                    close_client(epoll_fd, clients, fd);
+                if (handle_client_read(epoll_fd, clients, pool, fd, *args.map) == -1)
+                    close_client(epoll_fd, clients, pool, fd);
             }
         }
     }
 
-shutdown:
-    for (int fd = 0; fd < MAX_FDS; ++fd) {
-        if (clients[fd] != nullptr)
-            close_client(epoll_fd, clients, fd);
-    }
+worker_shutdown:
+    for (int fd = 0; fd < MAX_FDS; ++fd)
+        if (clients[fd])
+            close_client(epoll_fd, clients, pool, fd);
 
     free(clients);
     close(epoll_fd);
     close(listen_fd);
+}
+
+int run_server(const ServerConfig& config) {
+    signal(SIGPIPE, SIG_IGN);
+
+    unsigned int n = config.num_threads;
+    if (n == 0)
+        n = std::thread::hardware_concurrency();
+    if (n == 0)
+        n = 1;
+
+    SharedHashMap map(config.hashmap_capacity, config.hashmap_buckets);
+
+    printf("kvc listening on 0.0.0.0:%u with %u worker thread(s)\n", config.port, n);
+    fflush(stdout);
+
+    std::vector<std::thread> workers;
+    workers.reserve(n);
+
+    for (unsigned int i = 0; i < n; ++i)
+        workers.emplace_back(run_worker, WorkerArgs{static_cast<int>(i), config.port, &map});
+
+    for (auto& t : workers)
+        t.join();
+
     return 0;
 }
 
