@@ -82,7 +82,7 @@ else
     ssh "${SSH_OPTS[@]}" "$ADMIN@$VM_IP" bash -s <<'REMOTE'
 sudo apt-get update -qq
 sudo apt-get install -y --no-install-recommends \
-    build-essential python3 python3-pip \
+    build-essential cmake python3 python3-pip \
     util-linux perl libc6-dbg \
     linux-tools-common
 KVER=$(uname -r)

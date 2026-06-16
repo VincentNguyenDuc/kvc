@@ -20,6 +20,7 @@ RUN apt-get update \
         linux-perf \
         python3 \
         python3-dev \
+        rsync \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
@@ -29,5 +30,7 @@ RUN curl -fsSL https://starship.rs/install.sh | sh -s -- -y \
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && echo 'export PATH="/root/.local/bin:$PATH"' >> /etc/bash.bashrc
+
+RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash
 
 CMD ["bash"]
