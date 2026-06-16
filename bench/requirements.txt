@@ -1,4 +1,0 @@
-streamlit>=1.35
-plotly>=5.22
-pandas>=2.2
-watchdog>=6.0.0
