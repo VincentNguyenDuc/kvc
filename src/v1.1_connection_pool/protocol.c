@@ -2,7 +2,7 @@
 
 #include <string.h>
 
-int parse_request(char *line, size_t len, Request *out) {
+int parse_request(char* line, size_t len, Request* out) {
     if (line == NULL || out == NULL)
         return -1;
 
@@ -13,16 +13,16 @@ int parse_request(char *line, size_t len, Request *out) {
     if (len == 0)
         return -1;
 
-    char *end = line + len;
-    char *p = line;
+    char* end = line + len;
+    char* p = line;
 
     while (p < end && (*p == ' ' || *p == '\t'))
         p++;
     if (p == end)
         return -1;
 
-    char *cmd = p;
-    char *cmd_end = memchr(p, ' ', (size_t)(end - p));
+    char* cmd = p;
+    char* cmd_end = memchr(p, ' ', (size_t)(end - p));
     size_t cmd_len = cmd_end != NULL ? (size_t)(cmd_end - cmd) : (size_t)(end - cmd);
 
     if (cmd_len != 3)
@@ -36,11 +36,11 @@ int parse_request(char *line, size_t len, Request *out) {
         if (p == end)
             return -1;
 
-        char *key = p;
-        char *key_end = memchr(p, ' ', (size_t)(end - p));
+        char* key = p;
+        char* key_end = memchr(p, ' ', (size_t)(end - p));
         size_t klen;
         if (key_end != NULL) {
-            char *trail = key_end;
+            char* trail = key_end;
             while (trail < end && (*trail == ' ' || *trail == '\t'))
                 trail++;
             if (trail != end)
@@ -62,11 +62,11 @@ int parse_request(char *line, size_t len, Request *out) {
         if (p == end)
             return -1;
 
-        char *key = p;
-        char *key_end = memchr(p, ' ', (size_t)(end - p));
+        char* key = p;
+        char* key_end = memchr(p, ' ', (size_t)(end - p));
         size_t klen;
         if (key_end != NULL) {
-            char *trail = key_end;
+            char* trail = key_end;
             while (trail < end && (*trail == ' ' || *trail == '\t'))
                 trail++;
             if (trail != end)
@@ -88,8 +88,8 @@ int parse_request(char *line, size_t len, Request *out) {
         if (p == end)
             return -1;
 
-        char *key = p;
-        char *key_end = memchr(p, ' ', (size_t)(end - p));
+        char* key = p;
+        char* key_end = memchr(p, ' ', (size_t)(end - p));
         if (key_end == NULL)
             return -1;
 
@@ -97,7 +97,7 @@ int parse_request(char *line, size_t len, Request *out) {
         if (klen == 0 || klen >= sizeof(out->key))
             return -1;
 
-        char *val = key_end;
+        char* val = key_end;
         while (val < end && (*val == ' ' || *val == '\t'))
             val++;
         if (val == end)

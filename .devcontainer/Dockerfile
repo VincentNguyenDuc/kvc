@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim AS base
 
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
@@ -27,6 +27,7 @@ WORKDIR /workspace
 RUN curl -fsSL https://starship.rs/install.sh | sh -s -- -y \
    && echo 'eval "$(starship init bash)"' >> /etc/bash.bashrc
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && echo 'export PATH="/root/.local/bin:$PATH"' >> /etc/bash.bashrc
 
 CMD ["bash"]

@@ -13,6 +13,6 @@ typedef struct Request {
     char value[PROTOCOL_MAX_VALUE];
 } Request;
 
-int parse_request(char *line, size_t len, Request *out);
+int parse_request(char* line, size_t len, Request* out);
 
 #endif

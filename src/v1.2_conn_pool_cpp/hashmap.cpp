@@ -2,7 +2,8 @@
 
 #include <ctime>
 
-HashMap::HashMap(size_t capacity, size_t bucket_count) : capacity_(capacity) {
+HashMap::HashMap(size_t capacity, size_t bucket_count)
+    : capacity_(capacity) {
     data_.reserve(bucket_count);
 }
 
@@ -18,7 +19,7 @@ void HashMap::evict_one() {
     }
 }
 
-int HashMap::set(const char *key, const char *value, time_t ttl_seconds) {
+int HashMap::set(const char* key, const char* value, time_t ttl_seconds) {
     if (key == nullptr || value == nullptr)
         return -1;
 
@@ -45,7 +46,7 @@ int HashMap::set(const char *key, const char *value, time_t ttl_seconds) {
     return 1;
 }
 
-const char *HashMap::get(const char *key) {
+const char* HashMap::get(const char* key) {
     if (key == nullptr)
         return nullptr;
 
@@ -61,12 +62,10 @@ const char *HashMap::get(const char *key) {
     return it->second.value.c_str();
 }
 
-bool HashMap::del(const char *key) {
+bool HashMap::del(const char* key) {
     if (key == nullptr)
         return false;
     return data_.erase(key) > 0;
 }
 
-size_t HashMap::count() const {
-    return data_.size();
-}
+size_t HashMap::count() const { return data_.size(); }
