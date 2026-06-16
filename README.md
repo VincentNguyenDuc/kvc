@@ -47,6 +47,7 @@ cmake --build --preset release
 # Build a single version (target = kvc_<version> with dots replaced by underscores)
 cmake --build --preset release --target kvc_v1_baseline
 cmake --build --preset debug   --target kvc_v2_better_hashmap
+cmake --build --preset release --target kvc_v31_multicore_shared_map
 ```
 
 Binaries land at `build/<preset>/<version>/kvc`.
@@ -59,6 +60,7 @@ Binaries land at `build/<preset>/<version>/kvc`.
 python3 bench/main.py                                               # v1_baseline, 1 connection
 python3 bench/main.py --connections 4 --requests 200000
 python3 bench/main.py --version v2_better_hashmap --label "v2 run"
+python3 bench/main.py --version v3.1_multicore_shared_map --connections 16 --label "v3.1 run"
 ```
 
 Output is auto-generated under `bench/output/<version>/<run-id>/`.
@@ -104,9 +106,9 @@ Each run writes to `bench/output/<version>/<run-id>/`:
 ## Dashboard
 
 ```bash
-pip install -r bench/requirements.txt
-streamlit run bench/dashboard.py
+make docs
 ```
 
-Interactive Streamlit dashboard with Overview, Trends, Compare, and About tabs.
-Auto-reloads from `bench/output/` every 30 seconds.
+Regenerates `docs/data/runs.json` from `bench/output/` and serves the static
+dashboard at `http://localhost:8000`. Commit `docs/data/` to publish updated
+results to GitHub Pages.

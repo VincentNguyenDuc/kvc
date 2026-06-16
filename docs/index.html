@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>kvc — benchmark dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body>
+
+<header>
+  <h1>kvc <span>benchmark dashboard</span></h1>
+</header>
+
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+      <p class="sidebar-heading">Filters</p>
+      <div class="filter-group">
+        <span class="filter-label">Version</span>
+        <div id="filter-version" class="checkboxes"></div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Environment</span>
+        <div id="filter-env" class="checkboxes"></div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Connections</span>
+        <div id="filter-connections" class="checkboxes"></div>
+      </div>
+      <p id="run-count" class="run-count"></p>
+    </div>
+  </aside>
+
+  <div class="content">
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="about">About</button>
+      <button class="tab-btn" data-tab="overview">Overview</button>
+      <button class="tab-btn" data-tab="trends">Trends</button>
+      <button class="tab-btn" data-tab="compare">Compare</button>
+    </nav>
+
+    <p id="loading" class="status-msg">Loading runs…</p>
+    <p id="error"   class="status-msg error hidden"></p>
+
+    <div id="tab-content" style="display:none">
+      <section class="panel active" id="panel-about"></section>
+      <section class="panel"        id="panel-overview"></section>
+      <section class="panel"        id="panel-trends"></section>
+      <section class="panel"        id="panel-compare"></section>
+    </div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

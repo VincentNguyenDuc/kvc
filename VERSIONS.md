@@ -4,3 +4,4 @@
 | `v1.1_connection_pool` | Same as v1_baseline. Replaces per-connection `calloc`/`free` with a pre-allocated free-list pool. Isolates the cost of heap allocation on connect/disconnect. |
 | `v1.2_conn_pool_cpp`   | C++17 port of v1.1_connection_pool. Identical logic and data structures; isolates any overhead introduced by the C++ toolchain.                               |
 | `v2_better_hashmap`    | Arena-backed hashmap with open-addressing, doubly-linked bucket chains for O(1) removal, FIFO ring-buffer eviction, and per-key TTL support.                  |
+| `v3.1_multicore_shared_map` | Multi-threaded server: N worker threads (default `hardware_concurrency`), each with its own `SO_REUSEPORT` socket and epoll loop. Single shared `SharedHashMap` protected by `std::shared_mutex` — concurrent GETs, serialized writes. Quantifies the gain from using all cores against the cost of reader-writer lock contention. |
